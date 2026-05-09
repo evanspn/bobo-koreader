@@ -17,7 +17,6 @@ local Device = require("device")
 local Font = require("ui/font")
 local TextWidget = require("ui/widget/textwidget")
 local ScrollableContainer = require("ui/widget/container/scrollablecontainer")
-local MovableContainer = require("ui/widget/container/movablecontainer")
 
 local Backend = require("Backend")
 local ErrorDialog = require("ErrorDialog")
@@ -268,7 +267,7 @@ function Settings:init()
     align = "left",
   }
 
-  for _, tuple in ipairs(Settings.setting_value_definitions) do
+  for _i, tuple in ipairs(Settings.setting_value_definitions) do
     local key = tuple[1]
     local definition = tuple[2]
     if definition.type == 'profiles_button' then
@@ -338,10 +337,11 @@ function Settings:init()
     end,
   }
 
+  local title_bar_h = self.title_bar:getSize().h
   local scrollable = ScrollableContainer:new {
     dimen = Geom:new {
-      w = self.dimen.w,
-      h = self.dimen.h - self.title_bar.dimen.h,
+      w = self.item_width,
+      h = self.dimen.h - title_bar_h,
     },
     vertical_group,
   }
@@ -370,12 +370,7 @@ function Settings:init()
     content
   }
 
-  self.movable = MovableContainer:new {
-    self[1],
-    unmovable = self.unmovable,
-  }
   scrollable.show_parent = self
-
 
   UIManager:setDirty(self, "ui")
 end
@@ -414,14 +409,22 @@ function Settings:fetchAndShow(on_return_callback)
   local response = Backend.getSettings()
   if response.type == 'ERROR' then
     ErrorDialog:show(response.message)
+    return
   end
 
-  local ui = Settings:new {
-    settings = response.body,
-    on_return_callback = on_return_callback
-  }
-  ui.on_return_callback = on_return_callback
-  UIManager:show(ui)
+  local ok, result = pcall(function()
+    return Settings:new {
+      settings = response.body,
+      on_return_callback = on_return_callback
+    }
+  end)
+
+  if not ok then
+    ErrorDialog:show(_("Settings failed to open") .. ": " .. tostring(result))
+    return
+  end
+
+  UIManager:show(result)
 end
 
 return Settings
