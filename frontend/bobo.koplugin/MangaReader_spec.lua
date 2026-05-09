@@ -365,6 +365,131 @@ describe("MangaReader:show manga-switch job clearing", function()
   end)
 end)
 
+-- ─── orientation sidecar writes (PR #22) ─────────────────────────────────────
+--
+-- MangaReader writes the user's preferred portrait orientation
+-- (`bobo_app_orientation`) directly into each chapter's `.sdr` sidecar before
+-- KOReader opens the document, so KOReader picks up the right `rotation_mode`
+-- from the start. See koreader-ui-guide.md for the colon/dot and `_G.` rules
+-- the stubs below follow.
+
+local function make_recording_docsettings()
+  local saved = {}
+  local original_open = package.loaded["docsettings"].open
+  package.loaded["docsettings"].open = function(_, _path)
+    return {
+      readSetting = function() end,
+      saveSetting = function(_, key, value) saved[key] = value end,
+      flush = noop,
+    }
+  end
+  return saved, original_open
+end
+
+describe("MangaReader:show orientation sidecar (first-open path)", function()
+  local saved_calls
+  local original_docsettings_open
+
+  before_each(function()
+    reset_manga_reader()
+    saved_calls, original_docsettings_open = make_recording_docsettings()
+
+    _G.G_reader_settings = {
+      readSetting = function(_, key)
+        if key == "bobo_app_orientation" then return "left_hand" end
+      end,
+    }
+
+    package.loaded["ui/event"]                        = { new = function(_, name) return { name = name } end }
+    package.loaded["ui/uimanager"].broadcastEvent     = noop
+    package.loaded["apps/reader/readerui"].showReader = noop
+    package.loaded["apps/reader/readerui"].instance   = nil
+  end)
+
+  after_each(function()
+    _G.G_reader_settings = nil
+    package.loaded["docsettings"].open = original_docsettings_open
+    package.loaded["ui/event"] = nil
+    package.loaded["ui/uimanager"].broadcastEvent = nil
+    package.loaded["apps/reader/readerui"].showReader = nil
+  end)
+
+  local function show()
+    MangaReader:show({
+      path                    = "/tmp/ch.cbz",
+      on_return_callback      = function() end,
+      on_end_of_book_callback = function() end,
+    })
+  end
+
+  it("writes rotation_mode = 2 to the sidecar when orientation is left_hand", function()
+    show()
+    assert.equal(2, saved_calls.rotation_mode)
+  end)
+
+  it("writes rotation_mode = 0 when orientation is right_hand", function()
+    _G.G_reader_settings.readSetting = function() return "right_hand" end
+    show()
+    assert.equal(0, saved_calls.rotation_mode)
+  end)
+
+  it("falls back to rotation_mode = 0 when bobo_app_orientation is unset", function()
+    _G.G_reader_settings.readSetting = function() return nil end
+    show()
+    assert.equal(0, saved_calls.rotation_mode)
+  end)
+end)
+
+describe("MangaReader:carryOverReaderSettings orientation sidecar", function()
+  local saved_calls
+  local original_docsettings_open
+
+  before_each(function()
+    reset_manga_reader()
+    saved_calls, original_docsettings_open = make_recording_docsettings()
+
+    _G.G_reader_settings = {
+      readSetting = function(_, key)
+        if key == "bobo_app_orientation" then return "left_hand" end
+      end,
+    }
+
+    package.loaded["apps/reader/readerui"].instance = {
+      document     = { file = "/tmp/old.cbz" },
+      doc_settings = { readSetting = function() return nil end },
+    }
+  end)
+
+  after_each(function()
+    _G.G_reader_settings = nil
+    package.loaded["docsettings"].open = original_docsettings_open
+    package.loaded["apps/reader/readerui"].instance = nil
+  end)
+
+  it("writes rotation_mode = 2 to the new sidecar for left_hand", function()
+    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
+    assert.equal(2, saved_calls.rotation_mode)
+  end)
+
+  it("writes rotation_mode = 0 to the new sidecar for right_hand", function()
+    _G.G_reader_settings.readSetting = function() return "right_hand" end
+    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
+    assert.equal(0, saved_calls.rotation_mode)
+  end)
+
+  it("does nothing when the new path equals the current document path", function()
+    package.loaded["apps/reader/readerui"].instance.document.file = "/tmp/new.cbz"
+    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
+    assert.is_nil(saved_calls.rotation_mode)
+  end)
+
+  it("does nothing when ReaderUI has no active instance", function()
+    package.loaded["apps/reader/readerui"].instance = nil
+    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
+    assert.is_nil(saved_calls.rotation_mode)
+  end)
+end)
+
 -- ─── prunePreloadJobs poll throttle ──────────────────────────────────────────
 
 describe("MangaReader:onPageUpdate poll throttle", function()
