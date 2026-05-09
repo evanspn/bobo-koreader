@@ -135,8 +135,9 @@ function Testing:periodicallyReadIPC()
           install_source = function()
             local Backend = require("Backend")
             local source_id = decoded.params.source_id
+            local source_of_source = decoded.params.source_of_source
 
-            local response = Backend.installSource(source_id)
+            local response = Backend.installSource(source_id, source_of_source)
             if response.type == 'ERROR' then
               logger.warn("Failed to install source:", response.message)
 
@@ -271,4 +272,4 @@ function Testing:onKeyPress(key)
   end
 end
 
-return os.getenv('RAKUYOMI_IS_TESTING') == '1' and Testing or NullTesting
+return os.getenv('BOBO_IS_TESTING') == '1' and Testing or NullTesting

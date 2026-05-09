@@ -60,3 +60,6 @@ jobs:
 
       - name: Tests
         run: cd backend && cargo test --all
+
+      - name: Clippy
+        run: cd backend && cargo clippy --all-targets -- -D warnings
