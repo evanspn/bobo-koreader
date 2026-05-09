@@ -54,10 +54,12 @@ jobs:
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features sqlite
 
-      - name: Prepare sqlx database
+      - name: Prepare sqlx offline cache
         env:
           DATABASE_URL: sqlite:///tmp/bobo-build.db
-        run: cd backend/shared && cargo sqlx db create && cargo sqlx migrate run
+        run: |
+          cd backend/shared && cargo sqlx db create && cargo sqlx migrate run
+          cd .. && cargo sqlx prepare --workspace
 
       - name: Get next version
         id: get-next-version
@@ -69,7 +71,7 @@ jobs:
 
       - name: Build plugin
         env:
-          DATABASE_URL: sqlite:///tmp/bobo-build.db
+          SQLX_OFFLINE: "true"
         run: |
           export SEMANTIC_RELEASE_VERSION="${{ steps.get-next-version.outputs.new-release-git-tag }}"
           bash scripts/build-all.sh ${{ matrix.target }}
