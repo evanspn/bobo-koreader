@@ -110,15 +110,6 @@ function MangaReader:show(options)
       end)
     end)
   else
-    -- Write preferred orientation into the sidecar before KOReader opens the
-    -- document for the first time, same as we do in carryOverReaderSettings.
-    local ok, init_settings = pcall(DocSettings.open, DocSettings, options.path)
-    if ok and init_settings then
-      local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-      init_settings:saveSetting("rotation_mode", orientation == "left_hand" and 2 or 0)
-      init_settings:flush()
-    end
-
     -- took this from opds reader
     local Event = require("ui/event")
     UIManager:broadcastEvent(Event:new("SetupShowReader"))
@@ -286,13 +277,6 @@ function MangaReader:carryOverReaderSettings(new_path)
     new_settings:flush()
     logger.info("bobo: carried", copied, "reader settings to new chapter")
   end
-
-  -- Write the preferred portrait orientation directly into the new chapter's
-  -- sidecar so KOReader loads it correctly when the document opens — avoids
-  -- any timing race between our nextTick and KOReader's sidecar-apply pass.
-  local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-  new_settings:saveSetting("rotation_mode", orientation == "left_hand" and 2 or 0)
-  new_settings:flush()
 end
 
 --- Cleans up finished preload jobs and marks chapters as downloaded in all_chapters.
