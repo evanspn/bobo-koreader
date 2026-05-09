@@ -6,7 +6,7 @@ local util = require("util")
 
 local Platform = require("Platform")
 
-local SERVER_STARTUP_TIMEOUT_SECONDS = tonumber(os.getenv('RAKUYOMI_SERVER_STARTUP_TIMEOUT') or 5)
+local SERVER_STARTUP_TIMEOUT_SECONDS = tonumber(os.getenv('BOBO_SERVER_STARTUP_TIMEOUT') or 5)
 
 --- @class Backend
 --- @field private server Server

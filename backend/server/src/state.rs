@@ -17,7 +17,6 @@ pub struct State {
     pub chapter_storage: Arc<Mutex<ChapterStorage>>,
     pub settings: Arc<Mutex<Settings>>,
     pub settings_path: PathBuf,
-    pub home_path: PathBuf,
     pub job_state: JobState,
     pub cancel_token_store: Arc<Mutex<HashMap<usize, CancellationToken>>>,
 }

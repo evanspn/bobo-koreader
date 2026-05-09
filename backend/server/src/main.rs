@@ -140,7 +140,6 @@ async fn main() -> anyhow::Result<()> {
         chapter_storage: Arc::new(Mutex::new(chapter_storage)),
         settings: Arc::new(Mutex::new(settings)),
         settings_path,
-        home_path: args.home_path.clone(),
         job_state: Default::default(),
         cancel_token_store: Arc::new(Mutex::new(HashMap::new())),
     };

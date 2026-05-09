@@ -61,11 +61,14 @@ async fn delete_profile(
 }
 
 async fn switch_profile(
-    StateExtractor(State { settings, settings_path, database, home_path, .. }): StateExtractor<State>,
+    StateExtractor(State { settings, settings_path, database, .. }): StateExtractor<State>,
     Path(id): Path<i64>,
 ) -> Result<Json<()>, AppError> {
+    let home_path = settings_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("settings path has no parent"))?;
     let mut settings = settings.lock().await;
     let mut database = database.lock().await;
-    usecases::switch_profile(&mut settings, &settings_path, &mut database, &home_path, id).await?;
+    usecases::switch_profile(&mut settings, &settings_path, &mut database, home_path, id).await?;
     Ok(Json(()))
 }

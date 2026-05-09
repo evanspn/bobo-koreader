@@ -23,7 +23,7 @@ local CARRY_KEYS = {
   "kopt_zoom_mode_value",
   "kopt_contrast",
   "kopt_page_gap_height",
-  "rotation_mode",
+  "rotation_mode",          -- screen rotation (portrait / landscape)
 }
 
 --- @class MangaReader
