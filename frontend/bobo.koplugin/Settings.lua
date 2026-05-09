@@ -303,10 +303,9 @@ function Settings:init()
         end
       })
     else
-      -- FIXME shouldn't the backend return the default value when unset?
       local value = self.settings[key]
-      if key == 'storage_path' and value == nil then
-        value = Paths.getHomeDirectory() .. '/downloads'
+      if value == nil then
+        value = definition.default
       end
 
       table.insert(vertical_group, SettingItem:new {
