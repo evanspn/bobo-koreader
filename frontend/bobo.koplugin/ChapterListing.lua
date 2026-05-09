@@ -901,7 +901,9 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       self:prunePreloadJobs()
 
       local nextChapter = findNextChapter(self.chapters, chapter)
-      local nextChapterDownloadJob = nextChapter and self.preload_jobs[nextChapter.id] or nil
+      -- Check both ChapterListing's jobs and MangaReader's background preload jobs
+      local nextChapterDownloadJob = nextChapter and
+        (self.preload_jobs[nextChapter.id] or MangaReader.preload_jobs[nextChapter.id]) or nil
 
       if nextChapter ~= nil then
         logger.info("opening next chapter", nextChapter)
@@ -950,6 +952,15 @@ function ChapterListing:openMenu()
   local dialog
 
   local buttons = {
+    {
+      {
+        text = "← " .. _("Back to library"),
+        callback = function()
+          UIManager:close(dialog)
+          self:onReturn()
+        end
+      },
+    },
     {
       {
         text = Icons.FA_BELL .. " " .. _("Add to Library"),

@@ -311,6 +311,11 @@ function MangaReader:closeReaderUi(done_callback)
     if ReaderUI.instance ~= nil then
       ReaderUI.instance:onClose()
     end
+
+    -- Bobo UIs are portrait-only; reset rotation before handing back control.
+    local Device = require("device")
+    Device.screen:setRotationMode(0)
+
     if FileManager.instance ~= nil then
       FileManager.instance:reinit()
     else
