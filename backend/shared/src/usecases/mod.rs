@@ -1,3 +1,7 @@
+pub mod create_profile;
+pub mod delete_profile;
+pub mod list_profiles;
+pub mod switch_profile;
 pub mod add_manga_to_library;
 pub mod add_manga_to_playlist;
 pub mod check_mangas_update;
@@ -40,6 +44,10 @@ pub mod uninstall_source;
 pub mod update_last_read_chapter;
 pub mod update_settings;
 
+pub use create_profile::create_profile;
+pub use delete_profile::delete_profile;
+pub use list_profiles::list_profiles;
+pub use switch_profile::switch_profile;
 pub use add_manga_to_library::add_manga_to_library;
 pub use add_manga_to_playlist::add_manga_to_playlist;
 pub use check_mangas_update::check_mangas_update;

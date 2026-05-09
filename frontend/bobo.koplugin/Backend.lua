@@ -870,6 +870,42 @@ function Backend.removeMangaFromPlaylist(playlist_id, source_id, manga_id)
   })
 end
 
+--- @class UserProfile: { id: number, name: string, active: boolean }
+
+--- Returns all configured user profiles.
+--- @return SuccessfulResponse<UserProfile[]>|ErrorResponse
+function Backend.listProfiles()
+  return Backend.requestJson({ path = "/profiles" })
+end
+
+--- Creates a new user profile with the given name.
+--- @return SuccessfulResponse<UserProfile>|ErrorResponse
+function Backend.createProfile(name)
+  return Backend.requestJson({
+    path = "/profiles",
+    method = 'POST',
+    body = { name = name },
+  })
+end
+
+--- Deletes the profile with the given id.
+--- @return SuccessfulResponse<nil>|ErrorResponse
+function Backend.deleteProfile(id)
+  return Backend.requestJson({
+    path = "/profiles/" .. id,
+    method = 'DELETE',
+  })
+end
+
+--- Switches the active profile to the one with the given id.
+--- @return SuccessfulResponse<nil>|ErrorResponse
+function Backend.switchProfile(id)
+  return Backend.requestJson({
+    path = "/profiles/" .. id .. "/switch",
+    method = 'POST',
+  })
+end
+
 -- we can't really rely upon Koreader informing us it has terminated because
 -- the plugin lifecycle is really obscure, so use the garbage collector to
 -- detect we're done and cleanup

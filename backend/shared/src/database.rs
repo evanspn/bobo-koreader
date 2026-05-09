@@ -42,6 +42,27 @@ impl Database {
         })
     }
 
+    /// Close the current connection pool and reopen it pointing at `new_path`, running migrations.
+    /// Used when switching profiles without restarting the server.
+    pub async fn switch_to(&mut self, new_path: &Path) -> Result<()> {
+        self.pool.close().await;
+
+        if let Some(parent) = new_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let options = SqliteConnectOptions::new()
+            .filename(new_path)
+            .create_if_missing(true);
+        let pool = Pool::<Sqlite>::connect_with(options).await?;
+        sqlx::migrate!().run(&pool).await?;
+
+        self.pool = pool;
+        self.filename = new_path.to_path_buf();
+
+        Ok(())
+    }
+
     pub async fn hot_replace(&mut self, buf: &Vec<u8>) -> Result<()> {
         self.pool.close().await;
 

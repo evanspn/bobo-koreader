@@ -2,6 +2,7 @@ mod job;
 mod manga;
 mod model;
 mod playlists;
+mod profile;
 mod settings;
 mod source;
 mod source_extractor;
@@ -68,13 +69,9 @@ async fn main() -> anyhow::Result<()> {
         .context("while trying to ensure bobo's home folder exists")?;
 
     let sources_path = args.home_path.join("sources");
-    let database_path = args.home_path.join("database.db");
     let default_downloads_folder_path = args.home_path.join("downloads");
     let settings_path = args.home_path.join("settings.json");
 
-    let database = Database::new(&database_path)
-        .await
-        .context("couldn't open database file")?;
     if !settings_path.exists() {
         info!(
             "settings file not found at {}, creating default",
@@ -89,6 +86,32 @@ async fn main() -> anyhow::Result<()> {
     }
     let settings = Settings::from_file(&settings_path)
         .with_context(|| format!("couldn't read settings file at {}", settings_path.display()))?;
+
+    let active_profile_id = settings.active_profile_id;
+    let profile_db_path = args
+        .home_path
+        .join("profiles")
+        .join(active_profile_id.to_string())
+        .join("database.db");
+
+    // Migrate legacy database.db → profiles/1/database.db on first run.
+    let legacy_db_path = args.home_path.join("database.db");
+    if legacy_db_path.exists() && !profile_db_path.exists() {
+        if let Some(parent) = profile_db_path.parent() {
+            fs::create_dir_all(parent).context("couldn't create profile directory")?;
+        }
+        fs::rename(&legacy_db_path, &profile_db_path)
+            .context("couldn't migrate legacy database to profile path")?;
+        info!(
+            "migrated {} to {}",
+            legacy_db_path.display(),
+            profile_db_path.display()
+        );
+    }
+
+    let database = Database::new(&profile_db_path)
+        .await
+        .context("couldn't open database file")?;
     let source_manager = SourceManager::from_folder(sources_path, settings.clone())
         .context("couldn't create source manager")?;
 
@@ -133,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(manga::routes())
         .merge(playlists::routes())
         .merge(job::routes())
+        .merge(profile::routes())
         .merge(settings::routes())
         .merge(source::routes())
         .merge(update::routes())
