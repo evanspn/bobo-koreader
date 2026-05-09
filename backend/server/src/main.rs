@@ -94,12 +94,13 @@ async fn main() -> anyhow::Result<()> {
         .join(active_profile_id.to_string())
         .join("database.db");
 
-    // Migrate legacy database.db → profiles/1/database.db on first run.
+    if let Some(parent) = profile_db_path.parent() {
+        fs::create_dir_all(parent).context("couldn't create profile directory")?;
+    }
+
+    // Migrate legacy database.db → profiles/<id>/database.db on first run.
     let legacy_db_path = args.home_path.join("database.db");
     if legacy_db_path.exists() && !profile_db_path.exists() {
-        if let Some(parent) = profile_db_path.parent() {
-            fs::create_dir_all(parent).context("couldn't create profile directory")?;
-        }
         fs::rename(&legacy_db_path, &profile_db_path)
             .context("couldn't migrate legacy database to profile path")?;
         info!(
