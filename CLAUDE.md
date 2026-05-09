@@ -35,3 +35,4 @@ Use conventional commits (`feat:`, `fix:`) — semantic-release derives the vers
 - sqlx query macros require `DATABASE_URL` at compile time; CI sets it to a temp SQLite file
 - Lua tests must run under LuaJIT (`goto` keyword used in `findNextChapter.lua`)
 - **Every new Lua feature or bug fix must include tests** — add a `*_spec.lua` file alongside the module (e.g. `MangaReader_spec.lua` next to `MangaReader.lua`). Run `busted --lua luajit -C frontend/bobo.koplugin .` and confirm all tests pass before pushing.
+- **Read [`docs/src/contributing/koreader-ui-guide.md`](docs/src/contributing/koreader-ui-guide.md) before touching any file under `frontend/bobo.koplugin/`** — it documents the KOReader widget patterns and busted-stubbing gotchas (lazy `dimen`, scrollbar widths, `_G.G_reader_settings`, colon-vs-dot stubs, Trapper coroutine errors) that this plugin has hit repeatedly.
