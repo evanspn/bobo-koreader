@@ -70,10 +70,8 @@ local ChapterListing = Menu:extend {
   -- scanlator filtering
   selected_scanlator = nil,
   available_scanlators = {},
-  -- keep track of preloads
   preload_count = 0,
   preload_on_progress = false,
-  preload_jobs = nil,
 }
 
 function ChapterListing:init()
@@ -97,15 +95,13 @@ function ChapterListing:init()
 
   -- we need to do this after updating
   self:updateChapterList()
-
-  self.preload_jobs = {}
 end
 
 function ChapterListing:onClose(call_return)
-  UIManager:close(self)
   if self.on_return_callback and call_return ~= false then
     self.on_return_callback()
   end
+  UIManager:close(self)
 end
 
 function ChapterListing:readSettings()
@@ -757,6 +753,23 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
       return
     end
 
+    -- Fast path: preload already finished, result is cached in the job object.
+    -- Skip the loading dialog entirely so chapter switching is seamless.
+    -- Guard: realpath returns nil if the file was deleted after preload
+    -- (storage cleanup, etc.). In that case fall through to a fresh download
+    -- and remove the stale job so startPreloading can retry it.
+    if download_job.result and download_job.result.type == 'SUCCESS' then
+      local manga_path = ffiutil.realpath(download_job.result.body[1])
+      if manga_path ~= nil then
+        self:findRootChapter(chapter).downloaded = true
+        callback(manga_path)
+        return
+      end
+      download_job.result = nil
+      download_job.started = false
+      MangaReader.preload_jobs[chapter.id] = nil
+    end
+
     local time = require("ui/time")
     local start_time = time.now()
     local response, cancelled = LoadingDialog:showAndRun(
@@ -823,64 +836,6 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
   end)
 end
 
---- @private
---- @param chapter Chapter
-function ChapterListing:preloadChapters(chapter)
-  for i = 1, self.preload_count do
-    local preloadChapter = findNextChapter(self.chapters, chapter)
-    if preloadChapter == nil then
-      logger.info("No more chapters to preload.")
-      break
-    end
-
-    if preloadChapter.downloaded or preloadChapter.locked then
-      logger.info("Chapter already downloaded or locked, skipping preload: ", preloadChapter.id)
-      chapter = preloadChapter
-      goto continue
-    end
-
-    if self.preload_jobs[preloadChapter.id] ~= nil then
-      logger.info("Chapter already being preloaded: ", preloadChapter.id)
-    else
-      logger.info("Preloading chapter: ", preloadChapter.id)
-      local preload_job = DownloadChapter:new(
-        preloadChapter.source_id,
-        preloadChapter.manga_id,
-        preloadChapter.id,
-        preloadChapter.chapter_num
-      )
-
-      local job_status = preload_job:start()
-      if job_status.type == 'ERROR' then
-        logger.err("Could not start preload job for chapter ", preloadChapter.id, ": ", job_status.message)
-      else
-        self.preload_jobs[preloadChapter.id] = preload_job
-      end
-    end
-
-    chapter = preloadChapter
-    ::continue::
-  end
-end
-
-function ChapterListing:prunePreloadJobs()
-  for chapter_id, job in pairs(self.preload_jobs) do
-    local status = job:poll()
-    if status.type == 'SUCCESS' or status.type == 'ERROR' then
-      logger.info("Pruning finished preload job for chapter: ", chapter_id)
-      self.preload_jobs[chapter_id] = nil
-
-      if status.type == 'SUCCESS' then
-        for __, chapter in ipairs(self.chapters) do
-          if chapter.id == chapter_id then
-            chapter.downloaded = true
-            break
-          end
-        end
-      end
-    end
-  end
-end
 
 --- @private
 --- @param chapter Chapter
@@ -889,8 +844,6 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
   self:downloadChapter(chapter, download_job, function(manga_path)
     local onReturnCallback = function()
       self:updateItems()
-      self:prunePreloadJobs()
-
       UIManager:show(self)
     end
 
@@ -898,12 +851,9 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       Backend.markChapterAsRead(chapter.source_id, chapter.manga_id, chapter.id)
 
       self:updateChapterList()
-      self:prunePreloadJobs()
 
       local nextChapter = findNextChapter(self.chapters, chapter)
-      -- Check both ChapterListing's jobs and MangaReader's background preload jobs
-      local nextChapterDownloadJob = nextChapter and
-        (self.preload_jobs[nextChapter.id] or MangaReader.preload_jobs[nextChapter.id]) or nil
+      local nextChapterDownloadJob = nextChapter and MangaReader.preload_jobs[nextChapter.id] or nil
 
       if nextChapter ~= nil then
         logger.info("opening next chapter", nextChapter)
@@ -957,7 +907,10 @@ function ChapterListing:openMenu()
         text = "← " .. _("Back to library"),
         callback = function()
           UIManager:close(dialog)
-          self:onReturn()
+          UIManager:close(self)
+          -- Bypass the callback chain: go directly to the library.
+          -- Lazy require avoids the circular dependency (LibraryView requires ChapterListing).
+          require("LibraryView"):fetchAndShow()
         end
       },
     },

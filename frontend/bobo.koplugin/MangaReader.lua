@@ -264,16 +264,18 @@ end
 function MangaReader:prunePreloadJobs()
   for chapter_id, job in pairs(self.preload_jobs) do
     local status = job:poll()
-    if status.type == 'SUCCESS' or status.type == 'ERROR' then
-      self.preload_jobs[chapter_id] = nil
-      if status.type == 'SUCCESS' then
-        for _, ch in ipairs(self.all_chapters) do
-          if ch.id == chapter_id then
-            ch.downloaded = true
-            break
-          end
+    if status.type == 'SUCCESS' then
+      -- Mark downloaded but keep the job object in the table.
+      -- onEndOfBookCallback needs to reuse the cached result; if we nil it out here
+      -- the job is garbage-collected before the end-of-book handler runs.
+      for _, ch in ipairs(self.all_chapters) do
+        if ch.id == chapter_id then
+          ch.downloaded = true
+          break
         end
       end
+    elseif status.type == 'ERROR' then
+      self.preload_jobs[chapter_id] = nil
     end
   end
 end
