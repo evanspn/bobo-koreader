@@ -72,6 +72,7 @@ local ChapterListing = Menu:extend {
   available_scanlators = {},
   -- keep track of preloads
   preload_count = 0,
+  preload_on_progress = false,
   preload_jobs = nil,
 }
 
@@ -472,6 +473,7 @@ function ChapterListing:fetchAndShow(manga, onReturnCallback, accept_cached_resu
     covers_fullscreen = true, -- hint for UIManager:_repaint()
     page = self.page,
     preload_count = settings.preload_chapters,
+    preload_on_progress = settings.preload_on_chapter_progress or false,
   }
   ui.on_return_callback = onReturnCallback
   UIManager:show(ui)
@@ -926,6 +928,7 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       chapter = chapter,
       all_chapters = self.chapters,
       preload_count = self.preload_count,
+      preload_on_progress = self.preload_on_progress,
       on_close_book_callback = function(chapter)
         Trapper:wrap(function()
           Backend.updateLastReadChapter(

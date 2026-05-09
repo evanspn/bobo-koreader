@@ -154,6 +154,14 @@ Settings.setting_value_definitions = {
     }
   },
   {
+    'preload_on_chapter_progress',
+    {
+      type = 'boolean',
+      title = _("Preload next chapter at 80% progress"),
+      default = false,
+    }
+  },
+  {
     'optimize_image',
     {
       type = 'boolean',
@@ -276,7 +284,7 @@ function Settings:init()
         radius = Size.radius.button,
         bordersize = Size.border.button,
         padding = Size.padding.button,
-        width = self.item_width,
+        width = self.item_width - ScrollableContainer:getScrollbarWidth(),
         callback = function()
           local ProfileManager = require("ProfileManager")
           ProfileManager:fetchAndShow(function()

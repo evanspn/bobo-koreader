@@ -39,8 +39,10 @@ local MangaReader = {
   preload_jobs = {},
   all_chapters = {},
   preload_count = 0,
+  preload_on_progress = false,
   -- last saved page to avoid redundant writes
   _last_saved_page = nil,
+  _progress_preload_triggered = false,
 }
 
 --- @class MangaReaderOptions
@@ -51,6 +53,7 @@ local MangaReader = {
 --- @field on_close_book_callback? fun(Chapter): nil Function to be called when the user closes the manga reader.
 --- @field all_chapters? Chapter[] Full ordered chapter list used for preloading the next chapters.
 --- @field preload_count? number How many chapters ahead to silently preload (from settings).
+--- @field preload_on_progress? boolean If true, preload the next chapter when 80% of the current one is read.
 
 --- Displays the file located in `path` in the KOReader's reader.
 --- If a file is already being displayed, it will be replaced.
@@ -63,7 +66,9 @@ function MangaReader:show(options)
   self.on_close_book_callback = options.on_close_book_callback
   self.all_chapters = options.all_chapters or {}
   self.preload_count = options.preload_count or 0
+  self.preload_on_progress = options.preload_on_progress or false
   self._last_saved_page = nil
+  self._progress_preload_triggered = false
   local c_showing = self.is_showing
 
   -- move set self.is_showing function Bobo:init call initializeFromReaderUI maybe random call sort
@@ -168,6 +173,16 @@ function MangaReader:onPageUpdate(new_page)
     new_page,
     scroll_offset
   )
+
+  if self.preload_on_progress and not self._progress_preload_triggered then
+    local total_pages = ReaderUI.instance
+      and ReaderUI.instance.document
+      and ReaderUI.instance.document:getPageCount()
+    if total_pages and total_pages > 0 and new_page / total_pages >= 0.8 then
+      self._progress_preload_triggered = true
+      self:startPreloading(chapter)
+    end
+  end
 
   self:prunePreloadJobs()
 end

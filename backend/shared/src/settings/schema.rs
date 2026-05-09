@@ -128,6 +128,11 @@ pub struct Settings {
     #[serde(default)]
     pub optimize_image: bool,
 
+    /// When enabled, the next chapter is preloaded in the background once the reader
+    /// reaches 80% of the current chapter.
+    #[serde(default)]
+    pub preload_on_chapter_progress: bool,
+
     #[serde(default)]
     pub library_view_mode: LibraryViewMode,
 

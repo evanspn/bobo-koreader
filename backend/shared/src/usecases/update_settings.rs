@@ -37,6 +37,7 @@ pub struct UpdateableSettings {
     source_skip_cron: Option<String>,
     preload_chapters: usize,
     optimize_image: bool,
+    preload_on_chapter_progress: bool,
     library_view_mode: LibraryViewMode,
     search_view_mode: SearchViewMode,
 }
@@ -54,6 +55,7 @@ impl UpdateableSettings {
         settings.source_skip_cron = self.source_skip_cron;
         settings.preload_chapters = self.preload_chapters;
         settings.optimize_image = self.optimize_image;
+        settings.preload_on_chapter_progress = self.preload_on_chapter_progress;
         settings.library_view_mode = self.library_view_mode;
         settings.search_view_mode = self.search_view_mode;
     }
@@ -74,6 +76,7 @@ impl From<&Settings> for UpdateableSettings {
             source_skip_cron: value.source_skip_cron.clone(),
             preload_chapters: value.preload_chapters,
             optimize_image: value.optimize_image,
+            preload_on_chapter_progress: value.preload_on_chapter_progress,
             library_view_mode: value.library_view_mode,
             search_view_mode: value.search_view_mode,
         }
