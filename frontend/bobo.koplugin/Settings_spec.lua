@@ -135,8 +135,8 @@ describe("Settings.fetchAndShow", function()
   before_each(function()
     shown_errors = {}
     shown_ui     = {}
-    error_dialog_stub.show = function(msg) table.insert(shown_errors, msg) end
-    uimanager_stub.show    = function(w)   table.insert(shown_ui, w) end
+    error_dialog_stub.show = function(_, msg) table.insert(shown_errors, msg) end
+    uimanager_stub.show    = function(_, w)   table.insert(shown_ui, w) end
   end)
 
   it("shows an error and does not open the UI when the backend call fails", function()
