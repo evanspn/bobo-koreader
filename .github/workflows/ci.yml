@@ -19,7 +19,7 @@ jobs:
           sudo luarocks install busted
 
       - name: Run tests
-        run: busted -C frontend/bobo.koplugin .
+        run: busted --lua luajit -C frontend/bobo.koplugin .
 
   test-rust:
     name: Rust tests & lint

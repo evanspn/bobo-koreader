@@ -1206,7 +1206,9 @@ impl Database {
                 ci.lang,
                 ci.locked AS "locked: bool",
                 cs.read AS "read?: bool",
-                cs.last_read AS "last_read?: i64"
+                cs.last_read AS "last_read?: i64",
+                cs.current_page AS "current_page?: i32",
+                cs.scroll_offset AS "scroll_offset?: i32"
             FROM chapter_informations ci
             LEFT JOIN chapter_state cs
                 ON ci.source_id = cs.source_id
@@ -1249,6 +1251,8 @@ impl Database {
                 let state = ChapterState {
                     read: row.read.unwrap_or(false),
                     last_read: row.last_read,
+                    current_page: row.current_page,
+                    scroll_offset: row.scroll_offset,
                 };
 
                 let downloaded = chapter_storage.get_stored_chapter(&id).is_some();

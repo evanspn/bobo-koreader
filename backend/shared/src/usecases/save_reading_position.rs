@@ -15,7 +15,6 @@ pub async fn save_reading_position(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use tempfile::NamedTempFile;
 
     async fn test_db() -> (Database, NamedTempFile) {
