@@ -90,7 +90,7 @@ describe("MangaReader:prunePreloadJobs", function()
   before_each(reset_manga_reader)
 
   it("keeps a successful job in preload_jobs so onEndOfBook can reuse it", function()
-    local job = make_job({ id = "ch2", result = { type = "SUCCESS", body = { "/tmp/ch2.cbz", {} } } })
+    local job = make_job({ id = "ch2", result = { type = "SUCCESS", body = { path = "/tmp/ch2.cbz", page_count = 10, errors = {} } } })
     MangaReader.preload_jobs["ch2"] = job
 
     MangaReader:prunePreloadJobs()
@@ -101,7 +101,7 @@ describe("MangaReader:prunePreloadJobs", function()
   it("marks the chapter as downloaded when its job succeeds", function()
     local ch = make_chapter("ch2", 2)
     MangaReader.all_chapters = { make_chapter("ch1", 1), ch }
-    local job = make_job({ id = "ch2", result = { type = "SUCCESS", body = { "/tmp/ch2.cbz", {} } } })
+    local job = make_job({ id = "ch2", result = { type = "SUCCESS", body = { path = "/tmp/ch2.cbz", page_count = 10, errors = {} } } })
     MangaReader.preload_jobs["ch2"] = job
 
     MangaReader:prunePreloadJobs()
@@ -303,7 +303,7 @@ describe("preload job lifecycle: prune then reuse", function()
     assert.is_not_nil(job, "job should exist after 80% trigger")
 
     -- Simulate job completing
-    job.result = { type = "SUCCESS", body = { "/tmp/ch2.cbz", {} } }
+    job.result = { type = "SUCCESS", body = { path = "/tmp/ch2.cbz", page_count = 10, errors = {} } }
 
     -- Multiple page turns — each calls prunePreloadJobs internally
     MangaReader:onPageUpdate(9)
@@ -315,7 +315,7 @@ describe("preload job lifecycle: prune then reuse", function()
 
     -- And the result must still be readable
     assert.equal("SUCCESS", MangaReader.preload_jobs["ch2"].result.type)
-    assert.equal("/tmp/ch2.cbz", MangaReader.preload_jobs["ch2"].result.body[1])
+    assert.equal("/tmp/ch2.cbz", MangaReader.preload_jobs["ch2"].result.body.path)
   end)
 end)
 

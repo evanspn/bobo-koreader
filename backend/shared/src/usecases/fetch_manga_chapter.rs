@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -13,6 +14,33 @@ use crate::{
     source::Source,
 };
 
+/// The result of fetching a chapter, returned by `fetch_manga_chapter`.
+/// Includes the on-disk path, page count (0 for novels), and any per-page errors.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChapterDownloadResult {
+    pub path: PathBuf,
+    pub page_count: usize,
+    pub errors: Vec<DownloadError>,
+}
+
+/// Count image pages inside a CBZ (ZIP) file.
+/// Returns 0 for epub/novel chapters or if the archive cannot be read.
+pub fn count_cbz_pages(path: &Path) -> usize {
+    if path.extension().and_then(|e| e.to_str()) != Some("cbz") {
+        return 0;
+    }
+    let Ok(file) = std::fs::File::open(path) else {
+        return 0;
+    };
+    let Ok(archive) = zip::ZipArchive::new(file) else {
+        return 0;
+    };
+    archive
+        .file_names()
+        .filter(|name| !name.ends_with(".xml") && !name.starts_with('.'))
+        .count()
+}
+
 pub async fn fetch_manga_chapter(
     token: &CancellationToken,
     database: &Database,
@@ -21,7 +49,7 @@ pub async fn fetch_manga_chapter(
     chapter_id: &ChapterId,
     concurrent_requests_pages: usize,
     optimize_image: bool,
-) -> Result<(PathBuf, Vec<DownloadError>), Error> {
+) -> Result<ChapterDownloadResult, Error> {
     let manga = database
         .find_cached_manga_information(chapter_id.manga_id())
         .await?
@@ -32,7 +60,7 @@ pub async fn fetch_manga_chapter(
         .await?
         .ok_or_else(|| anyhow!("Expected chapter to be in the database"))?;
 
-    ensure_chapter_is_in_storage(
+    let (path, errors) = ensure_chapter_is_in_storage(
         token,
         chapter_storage,
         source,
@@ -45,7 +73,11 @@ pub async fn fetch_manga_chapter(
     .map_err(|e| match e {
         ChapterDownloaderError::DownloadError(e) => Error::DownloadError(e),
         ChapterDownloaderError::Other(e) => Error::Other(e),
-    })
+    })?;
+
+    let page_count = count_cbz_pages(&path);
+
+    Ok(ChapterDownloadResult { path, page_count, errors })
 }
 
 #[derive(thiserror::Error, Debug)]

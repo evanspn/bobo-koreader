@@ -26,7 +26,7 @@ use crate::{
     },
 };
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct DownloadError {
     pub page_index: usize,
     pub url: String,

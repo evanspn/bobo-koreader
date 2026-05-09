@@ -1,8 +1,9 @@
 use shared::{
-    chapter_downloader::DownloadError, chapter_storage::ChapterStorage, database::Database,
-    model::ChapterId, source_collection::SourceCollection, source_manager::SourceManager, usecases,
+    chapter_storage::ChapterStorage, database::Database, model::ChapterId,
+    source_collection::SourceCollection, source_manager::SourceManager,
+    usecases::{self, ChapterDownloadResult},
 };
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -11,10 +12,9 @@ use crate::{AppError, ErrorResponse};
 
 use super::state::{Job, JobState};
 
-// FIXME this is kinda ugly, maybe some type aliases would help here
-type JobSender = watch::Sender<Option<Result<Arc<(PathBuf, Vec<DownloadError>)>, ErrorResponse>>>;
-type JobReceiver =
-    watch::Receiver<Option<Result<Arc<(PathBuf, Vec<DownloadError>)>, ErrorResponse>>>;
+type JobSender = watch::Sender<Option<Result<Arc<ChapterDownloadResult>, ErrorResponse>>>;
+type JobReceiver = watch::Receiver<Option<Result<Arc<ChapterDownloadResult>, ErrorResponse>>>;
+
 pub struct DownloadChapterJob {
     tx: JobSender,
     rx: JobReceiver,
@@ -31,9 +31,8 @@ impl DownloadChapterJob {
         concurrent_requests_pages: usize,
         optimize_image: bool,
     ) -> Self {
-        let (tx, rx) = watch::channel::<
-            Option<Result<Arc<(PathBuf, Vec<DownloadError>)>, ErrorResponse>>,
-        >(None);
+        let (tx, rx) =
+            watch::channel::<Option<Result<Arc<ChapterDownloadResult>, ErrorResponse>>>(None);
 
         let cancellation_token = CancellationToken::new();
         let tx_clone = tx.clone();
@@ -70,7 +69,7 @@ impl DownloadChapterJob {
         chapter_id: ChapterId,
         concurrent_requests_pages: usize,
         optimize_image: bool,
-    ) -> Result<(PathBuf, Vec<DownloadError>), ErrorResponse> {
+    ) -> Result<ChapterDownloadResult, ErrorResponse> {
         let source = {
             let mgr = source_manager.lock().await;
             mgr.get_by_id(chapter_id.source_id())
@@ -95,7 +94,7 @@ impl DownloadChapterJob {
 
 impl Job for DownloadChapterJob {
     type Progress = ();
-    type Output = Arc<(PathBuf, Vec<DownloadError>)>;
+    type Output = Arc<ChapterDownloadResult>;
     type Error = ErrorResponse;
 
     async fn cancel(&self) -> Result<(), AppError> {

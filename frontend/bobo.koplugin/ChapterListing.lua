@@ -10,7 +10,6 @@ local logger = require("logger")
 local LoadingDialog = require("LoadingDialog")
 ---@diagnostic disable-next-line: different-requires
 local util = require("util")
-local ffiutil = require("ffi/util")
 local _ = require("gettext+")
 local IconButton = require("ui/widget/iconbutton")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -754,15 +753,14 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
     end
 
     -- Fast path: preload already finished, result is cached in the job object.
-    -- Skip the loading dialog entirely so chapter switching is seamless.
-    -- Guard: realpath returns nil if the file was deleted after preload
-    -- (storage cleanup, etc.). In that case fall through to a fresh download
-    -- and remove the stale job so startPreloading can retry it.
+    -- Ask the backend to confirm the file is still on disk — it owns file management,
+    -- not us. If the file was evicted, the backend returns ERROR and we fall through
+    -- to a fresh download.
     if download_job.result and download_job.result.type == 'SUCCESS' then
-      local manga_path = ffiutil.realpath(download_job.result.body[1])
-      if manga_path ~= nil then
+      local stored = Backend.getStoredChapter(chapter.source_id, chapter.manga_id, chapter.id)
+      if stored.type == 'SUCCESS' then
         self:findRootChapter(chapter).downloaded = true
-        callback(manga_path)
+        callback(stored.body.path)
         return
       end
       download_job.result = nil
@@ -820,19 +818,17 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
 
     self:findRootChapter(chapter).downloaded = true
 
-    if #response.body[2] > 0 then
-      logger.err("Download job errors: ", response.body[1])
+    if #response.body.errors > 0 then
+      logger.err("Download job errors: ", response.body.path)
 
       UIManager:show(InfoMessage:new {
-        text = formatDownloadErrors(response.body[2])
+        text = formatDownloadErrors(response.body.errors)
       })
     end
 
-    local manga_path = ffiutil.realpath(response.body[1])
-
     logger.info("Waited ", time.to_ms(time.since(start_time)), "ms for download job to finish.")
 
-    callback(manga_path)
+    callback(response.body.path)
   end)
 end
 

@@ -672,8 +672,18 @@ end
 
 --- @alias DownloadChapterJobDetails PendingJob<nil>|CompletedJob<[string, DownloadError[]]>|ErroredJob
 
+--- Checks whether a previously-downloaded chapter file is still on disk.
+--- Returns the file path and page count if present, or an ERROR response if not.
+--- @return SuccessfulResponse<{path:string,page_count:number,errors:table}>|ErrorResponse
+function Backend.getStoredChapter(source_id, manga_id, chapter_id)
+  return Backend.requestJson({
+    path = "/mangas/" .. source_id .. "/" .. manga_id .. "/chapters/" .. chapter_id .. "/stored",
+    method = 'GET'
+  })
+end
+
 --- Gets details about a job.
---- @return SuccessfulResponse<DownloadChapterJobDetails>|ErrorResponse
+--- @return SuccessfulResponse<{path:string,page_count:number,errors:table}>|ErrorResponse
 function Backend.getJobDetails(id)
   if id == nil then
     return { type = 'ERROR', message = 'job id is nil' }
