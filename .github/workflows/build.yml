@@ -48,8 +48,11 @@ jobs:
           path: ~/.local/share/containers
           key: ${{ runner.os }}-podman-cross-${{ matrix.target }}
 
-      - name: Install cross and sqlx-cli
-        run: cargo install cross sqlx-cli --no-default-features --features sqlite
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features sqlite
 
       - name: Prepare sqlx database
         env:
