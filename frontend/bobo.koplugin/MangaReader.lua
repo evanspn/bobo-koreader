@@ -78,6 +78,12 @@ function MangaReader:show(options)
     -- sidecar before switching, so KOReader loads them automatically.
     self:carryOverReaderSettings(options.path)
 
+    -- Capture screen rotation directly from the device. carryOverReaderSettings
+    -- writes it to the sidecar, but KOReader's sidecar restore is not always
+    -- reliable for CBZ rotation. Re-applying it after the switch is belt-and-suspenders.
+    local Device = require("device")
+    local saved_rotation = Device.screen:getRotationMode()
+
     self.is_switching_document = true
     ReaderUI.instance:switchDocument(options.path)
 
@@ -85,6 +91,10 @@ function MangaReader:show(options)
     -- `onCloseWidget`. Keep Bobo in "showing" state while that happens.
     UIManager:nextTick(function()
       self.is_switching_document = false
+      -- Double nextTick lets KOReader's document open handler run first.
+      UIManager:nextTick(function()
+        Device.screen:setRotationMode(saved_rotation)
+      end)
     end)
   else
     -- took this from opds reader
@@ -177,23 +187,26 @@ function MangaReader:onPageUpdate(new_page)
   if self.preload_on_progress and not self._progress_preload_triggered then
     local total_pages = ReaderUI.instance
       and ReaderUI.instance.document
-      and ReaderUI.instance.document:getPageCount()
+      and ReaderUI.instance.document:getNbPages()
     if total_pages and total_pages > 0 and new_page / total_pages >= 0.8 then
       self._progress_preload_triggered = true
-      self:startPreloading(chapter)
+      -- Preload at least 1 chapter regardless of preload_count setting.
+      self:startPreloading(chapter, math.max(1, self.preload_count))
     end
   end
 
   self:prunePreloadJobs()
 end
 
---- Silently downloads the next `preload_count` chapters in the background.
+--- Silently downloads the next N chapters in the background.
 --- No progress UI is shown — jobs run as fire-and-forget.
 --- @private
 --- @param current_chapter Chapter
-function MangaReader:startPreloading(current_chapter)
+--- @param count number? Chapters to preload; defaults to self.preload_count.
+function MangaReader:startPreloading(current_chapter, count)
+  count = count or self.preload_count
   local chapter = current_chapter
-  for _ = 1, self.preload_count do
+  for _ = 1, count do
     local next = findNextChapter(self.all_chapters, chapter)
     if next == nil then break end
 
