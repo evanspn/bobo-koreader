@@ -79,6 +79,7 @@ local function reset_manga_reader()
   MangaReader.preload_on_progress      = false
   MangaReader._progress_preload_triggered = false
   MangaReader._last_saved_page         = nil
+  MangaReader._prune_skip              = 0
   MangaReader.is_showing               = false
   MangaReader.chapter                  = nil
 end
@@ -315,5 +316,104 @@ describe("preload job lifecycle: prune then reuse", function()
     -- And the result must still be readable
     assert.equal("SUCCESS", MangaReader.preload_jobs["ch2"].result.type)
     assert.equal("/tmp/ch2.cbz", MangaReader.preload_jobs["ch2"].result.body[1])
+  end)
+end)
+
+-- ─── manga-switch clears stale preload jobs ───────────────────────────────────
+
+describe("MangaReader:show manga-switch job clearing", function()
+  before_each(reset_manga_reader)
+
+  local function show_chapter(source_id, manga_id, chapter_id)
+    -- Minimal show() call — no reader UI, no preloading needed
+    MangaReader.on_return_callback      = function() end
+    MangaReader.on_end_of_book_callback = function() end
+    MangaReader.all_chapters            = {}
+    MangaReader.preload_count           = 0
+    MangaReader.preload_on_progress     = false
+    MangaReader._last_saved_page        = nil
+    MangaReader._progress_preload_triggered = false
+    MangaReader._prune_skip             = 0
+    local prev = MangaReader.chapter
+    local new_ch = make_chapter(chapter_id, 1, { source_id = source_id, manga_id = manga_id })
+    if prev and (prev.manga_id ~= new_ch.manga_id or prev.source_id ~= new_ch.source_id) then
+      MangaReader.preload_jobs = {}
+    end
+    MangaReader.chapter = new_ch
+    MangaReader.is_showing = true
+  end
+
+  it("clears preload_jobs when switching to a different manga", function()
+    MangaReader.chapter = make_chapter("ch1", 1, { source_id = "src", manga_id = "manga-a" })
+    MangaReader.preload_jobs["ch2"] = make_job({ id = "ch2" })
+
+    show_chapter("src", "manga-b", "ch1")
+
+    assert.is_nil(MangaReader.preload_jobs["ch2"],
+      "jobs from previous manga must be cleared on manga switch")
+  end)
+
+  it("preserves preload_jobs when advancing within the same manga", function()
+    MangaReader.chapter = make_chapter("ch1", 1, { source_id = "src", manga_id = "manga-a" })
+    local existing = make_job({ id = "ch3" })
+    MangaReader.preload_jobs["ch3"] = existing
+
+    show_chapter("src", "manga-a", "ch2")
+
+    assert.equal(existing, MangaReader.preload_jobs["ch3"],
+      "preload jobs must survive chapter advance within same manga")
+  end)
+end)
+
+-- ─── prunePreloadJobs poll throttle ──────────────────────────────────────────
+
+describe("MangaReader:onPageUpdate poll throttle", function()
+  local poll_count
+
+  before_each(function()
+    reset_manga_reader()
+    poll_count = 0
+
+    backend_stub.saveReadingPosition = function() end
+
+    MangaReader.is_showing  = true
+    MangaReader.chapter     = make_chapter("ch1", 1)
+    MangaReader.all_chapters = { MangaReader.chapter }
+
+    -- Inject a pending job whose poll() we can count.
+    MangaReader.preload_jobs["ch1"] = {
+      poll = function()
+        poll_count = poll_count + 1
+        return { type = "PENDING" }
+      end
+    }
+
+    package.loaded["apps/reader/readerui"].instance = {
+      document = { getNbPages = function() return 100 end },
+      rolling  = nil,
+    }
+  end)
+
+  after_each(function()
+    package.loaded["apps/reader/readerui"].instance = nil
+  end)
+
+  it("polls on the first page turn", function()
+    MangaReader:onPageUpdate(1)
+    assert.equal(1, poll_count)
+  end)
+
+  it("skips the next 4 page turns after a poll", function()
+    MangaReader:onPageUpdate(1)   -- polls
+    MangaReader:onPageUpdate(2)   -- skip
+    MangaReader:onPageUpdate(3)   -- skip
+    MangaReader:onPageUpdate(4)   -- skip
+    MangaReader:onPageUpdate(5)   -- skip
+    assert.equal(1, poll_count, "should poll exactly once across 5 page turns")
+  end)
+
+  it("polls again on the 6th page turn", function()
+    for i = 1, 6 do MangaReader:onPageUpdate(i) end
+    assert.equal(2, poll_count, "should poll on turn 1 and turn 6")
   end)
 end)
