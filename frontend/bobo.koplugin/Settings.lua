@@ -17,7 +17,6 @@ local Device = require("device")
 local Font = require("ui/font")
 local TextWidget = require("ui/widget/textwidget")
 local ScrollableContainer = require("ui/widget/container/scrollablecontainer")
-local MovableContainer = require("ui/widget/container/movablecontainer")
 
 local Backend = require("Backend")
 local ErrorDialog = require("ErrorDialog")
@@ -338,10 +337,11 @@ function Settings:init()
     end,
   }
 
+  local title_bar_h = self.title_bar:getSize().h
   local scrollable = ScrollableContainer:new {
     dimen = Geom:new {
-      w = self.dimen.w,
-      h = self.dimen.h - self.title_bar.dimen.h,
+      w = self.item_width,
+      h = self.dimen.h - title_bar_h,
     },
     vertical_group,
   }
@@ -370,12 +370,7 @@ function Settings:init()
     content
   }
 
-  self.movable = MovableContainer:new {
-    self[1],
-    unmovable = self.unmovable,
-  }
   scrollable.show_parent = self
-
 
   UIManager:setDirty(self, "ui")
 end
