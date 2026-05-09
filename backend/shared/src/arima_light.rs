@@ -616,7 +616,7 @@ mod tests {
     use super::*;
     fn build_chapters(nums: Vec<Option<f32>>, ts: Vec<Option<i64>>) -> Vec<ChapterInformation> {
         nums.into_iter()
-            .zip(ts.into_iter())
+            .zip(ts)
             .map(|(cn, ts)| ChapterInformation {
                 chapter_number: cn,
                 last_updated: ts,
