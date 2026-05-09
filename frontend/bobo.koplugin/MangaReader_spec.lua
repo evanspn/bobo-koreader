@@ -322,25 +322,51 @@ end)
 -- ─── manga-switch clears stale preload jobs ───────────────────────────────────
 
 describe("MangaReader:show manga-switch job clearing", function()
-  before_each(reset_manga_reader)
+  local original_docsettings_open
+
+  before_each(function()
+    reset_manga_reader()
+
+    -- These tests now invoke the real MangaReader:show, which writes the
+    -- preferred orientation into the sidecar before KOReader opens the file.
+    -- Stub DocSettings.open as a recorder; the assertion target is
+    -- preload_jobs, not the sidecar.
+    original_docsettings_open = package.loaded["docsettings"].open
+    package.loaded["docsettings"].open = function(_, _path)
+      return {
+        readSetting = function() end,
+        saveSetting = function() end,
+        flush       = function() end,
+      }
+    end
+
+    -- Per koreader-ui-guide.md, KOReader globals must be stubbed with the
+    -- `_G.` prefix so the production module sees them across busted's
+    -- sandboxed environment. show() reads `bobo_app_orientation`.
+    _G.G_reader_settings = { readSetting = function() return nil end }
+
+    -- show()'s first-open branch broadcasts SetupShowReader and calls
+    -- ReaderUI:showReader. Stub each so the call chain doesn't crash.
+    package.loaded["ui/event"]                        = { new = function(_, name) return { name = name } end }
+    package.loaded["ui/uimanager"].broadcastEvent     = noop
+    package.loaded["apps/reader/readerui"].showReader = noop
+  end)
+
+  after_each(function()
+    _G.G_reader_settings = nil
+    package.loaded["docsettings"].open = original_docsettings_open
+    package.loaded["ui/event"] = nil
+    package.loaded["ui/uimanager"].broadcastEvent = nil
+    package.loaded["apps/reader/readerui"].showReader = nil
+  end)
 
   local function show_chapter(source_id, manga_id, chapter_id)
-    -- Minimal show() call — no reader UI, no preloading needed
-    MangaReader.on_return_callback      = function() end
-    MangaReader.on_end_of_book_callback = function() end
-    MangaReader.all_chapters            = {}
-    MangaReader.preload_count           = 0
-    MangaReader.preload_on_progress     = false
-    MangaReader._last_saved_page        = nil
-    MangaReader._progress_preload_triggered = false
-    MangaReader._prune_skip             = 0
-    local prev = MangaReader.chapter
-    local new_ch = make_chapter(chapter_id, 1, { source_id = source_id, manga_id = manga_id })
-    if prev and (prev.manga_id ~= new_ch.manga_id or prev.source_id ~= new_ch.source_id) then
-      MangaReader.preload_jobs = {}
-    end
-    MangaReader.chapter = new_ch
-    MangaReader.is_showing = true
+    MangaReader:show({
+      path                    = "/tmp/" .. chapter_id .. ".cbz",
+      chapter                 = make_chapter(chapter_id, 1, { source_id = source_id, manga_id = manga_id }),
+      on_return_callback      = function() end,
+      on_end_of_book_callback = function() end,
+    })
   end
 
   it("clears preload_jobs when switching to a different manga", function()
