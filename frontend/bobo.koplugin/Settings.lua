@@ -193,7 +193,8 @@ Settings.setting_value_definitions = {
       title = _('Storage size limit'),
       min_value = 1,
       max_value = 10240,
-      unit = 'MB'
+      unit = 'MB',
+      default = 2000,
     }
   },
   {
