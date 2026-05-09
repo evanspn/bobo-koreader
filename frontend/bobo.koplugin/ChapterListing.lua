@@ -878,7 +878,7 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       path = manga_path,
       on_end_of_book_callback = onEndOfBookCallback,
       chapter = chapter,
-      all_chapters = self.chapters,
+      all_chapters = self.raw_chapters,
       preload_count = self.preload_count,
       preload_on_progress = self.preload_on_progress,
       on_close_book_callback = function(chapter)

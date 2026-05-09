@@ -43,6 +43,8 @@ local MangaReader = {
   -- last saved page to avoid redundant writes
   _last_saved_page = nil,
   _progress_preload_triggered = false,
+  -- poll throttle: skip this many page turns before calling prunePreloadJobs again
+  _prune_skip = 0,
 }
 
 --- @class MangaReaderOptions
@@ -62,13 +64,24 @@ local MangaReader = {
 function MangaReader:show(options)
   self.on_return_callback = options.on_return_callback
   self.on_end_of_book_callback = options.on_end_of_book_callback
-  self.chapter = options.chapter
   self.on_close_book_callback = options.on_close_book_callback
   self.all_chapters = options.all_chapters or {}
   self.preload_count = options.preload_count or 0
   self.preload_on_progress = options.preload_on_progress or false
   self._last_saved_page = nil
   self._progress_preload_triggered = false
+  self._prune_skip = 0
+
+  -- Discard preload jobs from a previous manga so they don't collide with
+  -- this manga's chapter IDs.
+  local prev = self.chapter
+  local new_chapter = options.chapter
+  if prev and new_chapter and
+     (prev.manga_id ~= new_chapter.manga_id or prev.source_id ~= new_chapter.source_id) then
+    self.preload_jobs = {}
+  end
+
+  self.chapter = options.chapter
   local c_showing = self.is_showing
 
   -- move set self.is_showing function Bobo:init call initializeFromReaderUI maybe random call sort
@@ -195,7 +208,14 @@ function MangaReader:onPageUpdate(new_page)
     end
   end
 
-  self:prunePreloadJobs()
+  -- Throttle: poll the backend at most every 5 page turns to avoid hammering
+  -- the Unix socket on fast page flips.
+  if self._prune_skip > 0 then
+    self._prune_skip = self._prune_skip - 1
+  else
+    self:prunePreloadJobs()
+    self._prune_skip = 4
+  end
 end
 
 --- Silently downloads the next N chapters in the background.
