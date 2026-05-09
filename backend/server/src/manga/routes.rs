@@ -80,6 +80,10 @@ pub fn routes() -> Router<State> {
             post(download_manga_chapter),
         )
         .route(
+            "/mangas/{source_id}/{manga_id}/chapters/{chapter_id}/stored",
+            get(get_stored_chapter),
+        )
+        .route(
             "/mangas/{source_id}/{manga_id}/chapters/{chapter_id}/revoke",
             post(revoke_manga_chapter),
         )
@@ -596,6 +600,26 @@ impl From<DownloadMangaChapterParams> for ChapterId {
     }
 }
 
+async fn get_stored_chapter(
+    StateExtractor(State { chapter_storage, .. }): StateExtractor<State>,
+    Path(params): Path<DownloadMangaChapterParams>,
+) -> Result<Json<usecases::ChapterDownloadResult>, AppError> {
+    let chapter_id = ChapterId::from(params);
+    let chapter_storage = chapter_storage.lock().await;
+
+    let path = chapter_storage
+        .get_stored_chapter(&chapter_id)
+        .ok_or(AppError::NotFound)?;
+
+    let page_count = usecases::count_cbz_pages(&path);
+
+    Ok(Json(usecases::ChapterDownloadResult {
+        path,
+        page_count,
+        errors: vec![],
+    }))
+}
+
 async fn download_manga_chapter(
     StateExtractor(State {
         database,
@@ -607,7 +631,7 @@ async fn download_manga_chapter(
     SourceExtractor(source): SourceExtractor,
     Path(params): Path<DownloadMangaChapterParams>,
     Json(cancel_id): Json<Option<usize>>,
-) -> Result<Json<(String, Vec<shared::chapter_downloader::DownloadError>)>, AppError> {
+) -> Result<Json<usecases::ChapterDownloadResult>, AppError> {
     let settings = settings.lock().await;
     let database = database.lock().await;
     let token = create_token(cancel_token_store, cancel_id).await;
@@ -615,7 +639,8 @@ async fn download_manga_chapter(
     let chapter_id = ChapterId::from(params);
     let chapter_storage = &*chapter_storage.lock().await;
     let concurrent_requests_pages = settings.concurrent_requests_pages.unwrap_or(4);
-    let output_path = usecases::fetch_manga_chapter(
+
+    usecases::fetch_manga_chapter(
         &token.0,
         &database,
         &source,
@@ -625,12 +650,8 @@ async fn download_manga_chapter(
         settings.optimize_image,
     )
     .await
-    .map_err(AppError::from_fetch_manga_chapters_error)?;
-
-    Ok(Json((
-        output_path.0.to_string_lossy().into(),
-        output_path.1,
-    )))
+    .map(Json)
+    .map_err(AppError::from_fetch_manga_chapters_error)
 }
 
 async fn revoke_manga_chapter(

@@ -57,7 +57,7 @@ pub use clear_notifications::clear_notifications;
 pub use create_playlist::create_playlist;
 pub use delete_notification::delete_notification;
 pub use delete_playlist::delete_playlist;
-pub use fetch_manga_chapter::fetch_manga_chapter;
+pub use fetch_manga_chapter::{count_cbz_pages, fetch_manga_chapter, ChapterDownloadResult};
 pub use fetch_manga_chapters_in_batch::fetch_manga_chapters_in_batch;
 pub use find_orphan_or_read_files::find_orphan_or_read_files;
 pub use get_cached_manga_chapters::get_cached_manga_chapters;

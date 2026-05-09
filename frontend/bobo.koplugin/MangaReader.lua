@@ -23,7 +23,8 @@ local CARRY_KEYS = {
   "kopt_zoom_mode_value",
   "kopt_contrast",
   "kopt_page_gap_height",
-  "rotation_mode",          -- screen rotation (portrait / landscape)
+  -- rotation_mode intentionally omitted: chapter advance always resets to
+  -- the user's preferred portrait orientation (see closeReaderUi / show).
 }
 
 --- @class MangaReader
@@ -91,11 +92,7 @@ function MangaReader:show(options)
     -- sidecar before switching, so KOReader loads them automatically.
     self:carryOverReaderSettings(options.path)
 
-    -- Capture screen rotation directly from the device. carryOverReaderSettings
-    -- writes it to the sidecar, but KOReader's sidecar restore is not always
-    -- reliable for CBZ rotation. Re-applying it after the switch is belt-and-suspenders.
     local Device = require("device")
-    local saved_rotation = Device.screen:getRotationMode()
 
     self.is_switching_document = true
     ReaderUI.instance:switchDocument(options.path)
@@ -105,8 +102,11 @@ function MangaReader:show(options)
     UIManager:nextTick(function()
       self.is_switching_document = false
       -- Double nextTick lets KOReader's document open handler run first.
+      -- Reset to preferred portrait rather than carrying the previous chapter's
+      -- rotation — the user can re-rotate within the new chapter if needed.
       UIManager:nextTick(function()
-        Device.screen:setRotationMode(saved_rotation)
+        local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
+        Device.screen:setRotationMode(orientation == "left_hand" and 2 or 0)
       end)
     end)
   else
