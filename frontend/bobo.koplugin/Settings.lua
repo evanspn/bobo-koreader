@@ -162,6 +162,19 @@ Settings.setting_value_definitions = {
     }
   },
   {
+    'bobo_app_orientation',
+    {
+      type = 'enum',
+      title = _("App orientation"),
+      is_local = true,
+      options = {
+        { label = _("Right hand (portrait)"), value = 'right_hand' },
+        { label = _("Left hand (portrait)"),  value = 'left_hand' },
+      },
+      default = 'right_hand',
+    }
+  },
+  {
     'optimize_image',
     {
       type = 'boolean',
