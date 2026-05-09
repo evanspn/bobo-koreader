@@ -112,17 +112,11 @@ function MangaReader:show(options)
   else
     -- Write preferred orientation into the sidecar before KOReader opens the
     -- document for the first time, same as we do in carryOverReaderSettings.
-    -- Guard the whole open/save/flush sequence: show() may run inside a
-    -- Trapper coroutine where uncaught errors are swallowed silently.
-    local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-    local rotation_mode = orientation == "left_hand" and 2 or 0
-    local ok, err = pcall(function()
-      local init_settings = DocSettings:open(options.path)
-      init_settings:saveSetting("rotation_mode", rotation_mode)
+    local ok, init_settings = pcall(DocSettings.open, DocSettings, options.path)
+    if ok and init_settings then
+      local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
+      init_settings:saveSetting("rotation_mode", orientation == "left_hand" and 2 or 0)
       init_settings:flush()
-    end)
-    if not ok then
-      logger.warn("bobo: failed to write orientation to sidecar at", options.path, "-", err)
     end
 
     -- took this from opds reader
@@ -296,17 +290,9 @@ function MangaReader:carryOverReaderSettings(new_path)
   -- Write the preferred portrait orientation directly into the new chapter's
   -- sidecar so KOReader loads it correctly when the document opens — avoids
   -- any timing race between our nextTick and KOReader's sidecar-apply pass.
-  -- Guarded: this runs on chapter advance from Trapper-wrapped paths, where
-  -- an uncaught error in saveSetting/flush would be swallowed silently.
   local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-  local rotation_mode = orientation == "left_hand" and 2 or 0
-  local ok3, err = pcall(function()
-    new_settings:saveSetting("rotation_mode", rotation_mode)
-    new_settings:flush()
-  end)
-  if not ok3 then
-    logger.warn("bobo: failed to write orientation to new sidecar at", new_path, "-", err)
-  end
+  new_settings:saveSetting("rotation_mode", orientation == "left_hand" and 2 or 0)
+  new_settings:flush()
 end
 
 --- Cleans up finished preload jobs and marks chapters as downloaded in all_chapters.
