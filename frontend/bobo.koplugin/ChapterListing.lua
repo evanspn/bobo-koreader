@@ -759,12 +759,19 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
 
     -- Fast path: preload already finished, result is cached in the job object.
     -- Skip the loading dialog entirely so chapter switching is seamless.
+    -- Guard: realpath returns nil if the file was deleted after preload
+    -- (storage cleanup, etc.). In that case fall through to a fresh download
+    -- and remove the stale job so startPreloading can retry it.
     if download_job.result and download_job.result.type == 'SUCCESS' then
-      local response = download_job.result
-      self:findRootChapter(chapter).downloaded = true
-      local manga_path = ffiutil.realpath(response.body[1])
-      callback(manga_path)
-      return
+      local manga_path = ffiutil.realpath(download_job.result.body[1])
+      if manga_path ~= nil then
+        self:findRootChapter(chapter).downloaded = true
+        callback(manga_path)
+        return
+      end
+      download_job.result = nil
+      download_job.started = false
+      MangaReader.preload_jobs[chapter.id] = nil
     end
 
     local time = require("ui/time")
