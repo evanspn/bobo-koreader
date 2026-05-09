@@ -6,11 +6,19 @@ local C = ffi.C
 require "table.new"
 require "ffi/posix_h"
 
+local function _getPluginDir()
+  local src = debug.getinfo(1, "S").source
+  if src:sub(1, 1) == "@" then
+    return src:sub(2):match("^(.*)/[^/]*$")
+  end
+  return require("datastorage"):getFullDataDir() .. "/plugins/bobo.koplugin"
+end
+
 local GetText = {
   context = {},
   translation = {},
   current_lang = "C",
-  dirname = require("datastorage"):getFullDataDir() .. "/plugins/bobo.koplugin/l10n",
+  dirname = _getPluginDir() .. "/l10n",
   textdomain = "koreader",
   plural_default = "n != 1",
 }

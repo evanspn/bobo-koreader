@@ -138,7 +138,7 @@ template:
 	$(XGETTEXT_BIN) --from-code=utf-8 \
 		--keyword=C_:1c,2 --keyword=N_:1,2 --keyword=NC_:1c,2,3 \
 		--add-comments=@translators \
-		--package-name=rakuyomi.koreader \
+		--package-name=bobo.koreader \
 		--no-wrap \
 		--sort-by-file \
 		--package-version=`grep version ../_meta.lua | grep -Eo '[0-9.]+'` \
