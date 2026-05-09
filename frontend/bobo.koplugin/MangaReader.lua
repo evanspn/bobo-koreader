@@ -207,15 +207,18 @@ function MangaReader:carryOverReaderSettings(new_path)
   local current_path = ReaderUI.instance.document and ReaderUI.instance.document.file
   if not current_path or current_path == new_path then return end
 
-  local ok, current_settings = pcall(DocSettings.open, DocSettings, current_path)
-  if not ok or not current_settings then return end
+  -- Read from the live in-memory settings rather than reopening the sidecar from
+  -- disk. KOReader flushes doc_settings lazily, so a rotation or zoom change made
+  -- while reading may not be on disk yet when we call switchDocument.
+  local live_settings = ReaderUI.instance.doc_settings
+  if live_settings == nil then return end
 
   local ok2, new_settings = pcall(DocSettings.open, DocSettings, new_path)
   if not ok2 or not new_settings then return end
 
   local copied = 0
   for _, key in ipairs(CARRY_KEYS) do
-    local value = current_settings:readSetting(key)
+    local value = live_settings:readSetting(key)
     if value ~= nil then
       new_settings:saveSetting(key, value)
       copied = copied + 1
