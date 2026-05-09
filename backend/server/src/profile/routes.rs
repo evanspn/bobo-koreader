@@ -12,8 +12,8 @@ pub fn routes() -> Router<State> {
     Router::new()
         .route("/profiles", get(list_profiles))
         .route("/profiles", post(create_profile))
-        .route("/profiles/:id", delete(delete_profile))
-        .route("/profiles/:id/switch", post(switch_profile))
+        .route("/profiles/{id}", delete(delete_profile))
+        .route("/profiles/{id}/switch", post(switch_profile))
 }
 
 #[derive(Serialize)]
