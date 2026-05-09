@@ -757,6 +757,16 @@ function ChapterListing:downloadChapter(chapter, download_job, callback)
       return
     end
 
+    -- Fast path: preload already finished, result is cached in the job object.
+    -- Skip the loading dialog entirely so chapter switching is seamless.
+    if download_job.result and download_job.result.type == 'SUCCESS' then
+      local response = download_job.result
+      self:findRootChapter(chapter).downloaded = true
+      local manga_path = ffiutil.realpath(response.body[1])
+      callback(manga_path)
+      return
+    end
+
     local time = require("ui/time")
     local start_time = time.now()
     local response, cancelled = LoadingDialog:showAndRun(
