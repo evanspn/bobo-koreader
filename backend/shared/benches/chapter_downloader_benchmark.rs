@@ -1,6 +1,5 @@
 #![allow(unreachable_code)]
 #![allow(unreachable_patterns)]
-#![allow(unreachable_code)]
 
 #[allow(unused_imports)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

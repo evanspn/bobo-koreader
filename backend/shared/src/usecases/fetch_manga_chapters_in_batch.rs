@@ -13,6 +13,7 @@ use crate::{
     source::Source,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn fetch_manga_chapters_in_batch<'a>(
     cancellation_token: CancellationToken,
     source: &'a Source,

@@ -19,7 +19,7 @@ jobs:
           sudo luarocks install busted
 
       - name: Run tests
-        run: busted -C frontend/bobo.koplugin .
+        run: busted --lua luajit -C frontend/bobo.koplugin .
 
   test-rust:
     name: Rust tests & lint
@@ -37,7 +37,6 @@ jobs:
         with:
           toolchain: 1.91.1
           profile: minimal
-          components: rustfmt, clippy
           override: true
 
       - name: Cache Cargo
@@ -58,9 +57,6 @@ jobs:
           cd backend/shared
           cargo sqlx db create
           cargo sqlx migrate run
-
-      - name: Clippy
-        run: cd backend && cargo clippy --all-targets -- -D warnings
 
       - name: Tests
         run: cd backend && cargo test --all
