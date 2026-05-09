@@ -104,7 +104,7 @@ package.loaded["gettext+"]                                = function(s) return s
 package.loaded["Paths"]                                   = paths_stub
 package.loaded["ui/font"]                                 = font_stub
 package.loaded["ui/widget/textwidget"]                    = stub_class()
-package.loaded["ui/widget/container/scrollablecontainer"] = stub_class()
+package.loaded["ui/widget/container/scrollablecontainer"] = stub_class({ getScrollbarWidth = function() return 6 end })
 package.loaded["ui/widget/button"]                        = stub_class()
 package.loaded["widgets/SettingItem"]                     = setting_item_stub
 package.loaded["logger"]                                  = { info = function() end, warn = function() end, err = function() end }
