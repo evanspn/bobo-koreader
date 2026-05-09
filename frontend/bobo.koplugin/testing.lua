@@ -104,7 +104,7 @@ function Testing:setupIPC()
 
   local addr = ffi.new("struct sockaddr_un")
   addr.sun_family = AF_UNIX
-  local socket_path = "/tmp/rakuyomi_testing_ipc.sock"
+  local socket_path = "/tmp/bobo_testing_ipc.sock"
   ffi.copy(addr.sun_path, socket_path)
 
   local addr_size = ffi.sizeof("struct sockaddr_un")

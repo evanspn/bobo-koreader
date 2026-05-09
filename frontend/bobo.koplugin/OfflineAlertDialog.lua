@@ -9,7 +9,7 @@ local beforeWifi = require("utils/beforeWifi")
 local OfflineAlertDialog = {}
 
 -- Setting key name for the "do not show again" preference
-local SETTINGS_KEY = "rakuyomi_offline_alert_do_not_show_again"
+local SETTINGS_KEY = "bobo_offline_alert_do_not_show_again"
 
 --- Shows an alert dialog if the user is not connected to the internet.
 --- @param if_online_callback function|nil Callback to be called if the user is online.

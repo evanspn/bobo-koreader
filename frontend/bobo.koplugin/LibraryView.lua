@@ -313,7 +313,7 @@ function LibraryView:updateItems()
   local MenuItemChoice = MenuItemCover
   if mode == "grid" then
     MenuItemChoice = MenuItemGrid
-    self.grid_columns = G_reader_settings:readSetting("rakuyomi_grid_columns") or 3
+    self.grid_columns = G_reader_settings:readSetting("bobo_grid_columns") or 3
   else
     self.grid_columns = nil
   end
@@ -600,7 +600,7 @@ function LibraryView:_handleContinueReading(manga)
       table.sort(langs_list)
 
       local key = md5(manga.source.id .. "/" .. manga.id) .. "_lang"
-      local langs_selected = LuaSettings:open(DataStorage:getSettingsDir() .. "/rakuyomi_lang.lua"):readSetting(key, {})
+      local langs_selected = LuaSettings:open(DataStorage:getSettingsDir() .. "/bobo_lang.lua"):readSetting(key, {})
       -- If no preferences are set, default to selecting all available languages
       if not langs_selected or #langs_selected == 0 then
         langs_selected = langs_list

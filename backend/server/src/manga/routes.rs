@@ -92,6 +92,10 @@ pub fn routes() -> Router<State> {
             post(update_last_read),
         )
         .route(
+            "/mangas/{source_id}/{manga_id}/chapters/{chapter_id}/save-position",
+            post(save_position),
+        )
+        .route(
             "/mangas/{source_id}/{manga_id}/preferred-scanlator",
             get(get_manga_preferred_scanlator),
         )
@@ -670,6 +674,26 @@ async fn update_last_read(
     let database = database.lock().await;
 
     usecases::update_last_read_chapter(&database, &chapter_id).await?;
+
+    Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct SavePositionBody {
+    page: i32,
+    scroll_offset: i32,
+}
+
+async fn save_position(
+    StateExtractor(State { database, .. }): StateExtractor<State>,
+    SourceExtractor(_source): SourceExtractor,
+    Path(params): Path<DownloadMangaChapterParams>,
+    Json(SavePositionBody { page, scroll_offset }): Json<SavePositionBody>,
+) -> Result<Json<()>, AppError> {
+    let chapter_id = ChapterId::from(params);
+    let database = database.lock().await;
+
+    usecases::save_reading_position(&database, &chapter_id, page, scroll_offset).await?;
 
     Ok(Json(()))
 }

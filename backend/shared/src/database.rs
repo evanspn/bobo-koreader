@@ -1572,7 +1572,7 @@ impl Database {
         let maybe_row = sqlx::query_as!(
             ChapterStateRow,
             r#"
-                SELECT source_id, manga_id, chapter_id, read AS "read: bool", last_read AS "last_read?: i64" FROM chapter_state
+                SELECT source_id, manga_id, chapter_id, read AS "read: bool", last_read AS "last_read?: i64", current_page AS "current_page?: i32", scroll_offset AS "scroll_offset?: i32" FROM chapter_state
                 WHERE source_id = ?1 AND manga_id = ?2 AND chapter_id = ?3;
             "#,
             source_id,
@@ -1667,6 +1667,36 @@ impl Database {
             manga_id,
             chapter_id,
             now,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn save_reading_position(
+        &self,
+        id: &ChapterId,
+        page: i32,
+        offset: i32,
+    ) -> Result<()> {
+        let source_id = id.source_id().value();
+        let manga_id = id.manga_id().value();
+        let chapter_id = id.value();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO chapter_state (source_id, manga_id, chapter_id, read, current_page, scroll_offset)
+            VALUES (?1, ?2, ?3, FALSE, ?4, ?5)
+            ON CONFLICT DO UPDATE SET
+                current_page = excluded.current_page,
+                scroll_offset = excluded.scroll_offset
+        "#,
+            source_id,
+            manga_id,
+            chapter_id,
+            page,
+            offset,
         )
         .execute(&self.pool)
         .await?;
@@ -2995,6 +3025,8 @@ struct ChapterStateRow {
     chapter_id: String,
     read: bool,
     last_read: Option<i64>,
+    current_page: Option<i32>,
+    scroll_offset: Option<i32>,
 }
 
 impl From<ChapterStateRow> for ChapterState {
@@ -3002,6 +3034,8 @@ impl From<ChapterStateRow> for ChapterState {
         Self {
             read: value.read,
             last_read: value.last_read,
+            current_page: value.current_page,
+            scroll_offset: value.scroll_offset,
         }
     }
 }

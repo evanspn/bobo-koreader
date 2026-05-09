@@ -70,7 +70,7 @@ Settings.setting_value_definitions = {
     }
   },
   {
-    'rakuyomi_items_per_page',
+    'bobo_items_per_page',
     {
       type = 'integer',
       title = _("Items per page (0 = auto)"),
@@ -81,7 +81,7 @@ Settings.setting_value_definitions = {
     }
   },
   {
-    'rakuyomi_grid_columns',
+    'bobo_grid_columns',
     {
       type = 'integer',
       title = _("Grid columns"),
@@ -92,7 +92,7 @@ Settings.setting_value_definitions = {
     }
   },
   {
-    'rakuyomi_grid_rows',
+    'bobo_grid_rows',
     {
       type = 'integer',
       title = _("Grid rows"),

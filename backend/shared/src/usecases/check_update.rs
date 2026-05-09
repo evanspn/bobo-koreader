@@ -26,8 +26,8 @@ pub async fn check_update(current_version: String) -> anyhow::Result<CheckUpdate
     // Get latest release from GitHub API
     let client = reqwest::Client::new();
     let response = client
-        .get("https://api.github.com/repos/tachibana-shin/rakuyomi/releases/latest")
-        .header("User-Agent", "rakuyomi")
+        .get("https://api.github.com/repos/evanspn/bobo-koreader/releases/latest")
+        .header("User-Agent", "bobo")
         .timeout(Duration::from_secs(10))
         .send()
         .await

@@ -7,7 +7,7 @@ set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
 KOREADER_APP="$BUILD_DIR/KOReader.app"
-PLUGIN_DEST="$KOREADER_APP/Contents/koreader/plugins/rakuyomi.koplugin"
+PLUGIN_DEST="$KOREADER_APP/Contents/koreader/plugins/bobo.koplugin"
 KOREADER_ZIP="$REPO_ROOT/packages/koreader-macos-arm64.zip"
 
 ensure_cargo_in_shell() {
@@ -15,7 +15,7 @@ ensure_cargo_in_shell() {
     local cargo_env_line='. "$HOME/.cargo/env"'
     if ! grep -qF "$cargo_env_line" "$shell_rc" 2>/dev/null; then
         echo "" >> "$shell_rc"
-        echo "# Added by rakuyomi setup-macos.sh" >> "$shell_rc"
+        echo "# Added by bobo setup-macos.sh" >> "$shell_rc"
         echo "$cargo_env_line" >> "$shell_rc"
         echo "Added Cargo to PATH in $shell_rc"
     fi
@@ -93,13 +93,13 @@ copy_plugin_to() {
     local dest="$1"
     rm -rf "$dest"
     mkdir -p "$dest"
-    rsync -a --exclude='*_spec.lua' "$REPO_ROOT/frontend/rakuyomi.koplugin/" "$dest/"
+    rsync -a --exclude='*_spec.lua' "$REPO_ROOT/frontend/bobo.koplugin/" "$dest/"
 }
 
 install_plugin() {
     echo "Installing plugin..."
 
-    local user_plugin_dest="$HOME/Library/Application Support/koreader/plugins/rakuyomi.koplugin"
+    local user_plugin_dest="$HOME/Library/Application Support/koreader/plugins/bobo.koplugin"
 
     if [[ -d "$HOME/Library/Application Support/koreader" ]]; then
         # KOReader already has a user data dir — install only there.
@@ -117,7 +117,7 @@ install_plugin() {
     fi
 }
 
-echo "=== rakuyomi macOS dev setup ==="
+echo "=== bobo macOS dev setup ==="
 check_deps
 extract_koreader
 install_plugin

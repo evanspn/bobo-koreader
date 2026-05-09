@@ -41,7 +41,7 @@ struct Args {
     home_path: PathBuf,
 }
 
-const SOCKET_PATH: &str = "/tmp/rakuyomi.sock";
+const SOCKET_PATH: &str = "/tmp/bobo.sock";
 
 const DEFAULT_SETTINGS_JSON: &str = include_str!("../assets/default-settings.json");
 
@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     info!(
-        "starting rakuyomi, version: {}",
+        "starting bobo, version: {}",
         get_build_info()
             .map(|info| info.format_display())
             .unwrap_or_else(|| "unknown".into())
@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     fs::create_dir_all(&args.home_path)
-        .context("while trying to ensure rakuyomi's home folder exists")?;
+        .context("while trying to ensure bobo's home folder exists")?;
 
     let sources_path = args.home_path.join("sources");
     let database_path = args.home_path.join("database.db");

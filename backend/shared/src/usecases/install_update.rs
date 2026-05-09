@@ -16,12 +16,12 @@ pub async fn install_update(version: String, build_name: String) -> anyhow::Resu
     let current_exe = std::env::current_exe().context("Could not get current executable")?;
     let plugin_dir = current_exe
         .parent()
-        .context("Could not get rakuyomi's plugin directory")?;
+        .context("Could not get bobo's plugin directory")?;
 
     // Get the path of the temporary file
     let zip_path = update_zip_file.path().to_path_buf();
 
-    // Extract the update - the zip contains a rakuyomi.koplugin folder
+    // Extract the update - the zip contains a bobo.koplugin folder
     extract_update(&zip_path, plugin_dir).context("Could not extract update")?;
 
     // The update_zip_file (TempFile) will be automatically cleaned up when it goes out of scope here
@@ -34,7 +34,7 @@ fn cleanup_tmp() -> anyhow::Result<()> {
     for entry in std::fs::read_dir(&tmp_dir)? {
         let path = entry?.path();
         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with("rakuyomi") {
+            if name.starts_with("bobo") {
                 if path.is_dir() {
                     let _ = std::fs::remove_dir_all(&path);
                 } else {
@@ -48,16 +48,16 @@ fn cleanup_tmp() -> anyhow::Result<()> {
 /// Downloads the update zip file and saves it to a temporary file.
 async fn download_update_zip(version: &str, build_name: &str) -> anyhow::Result<NamedTempFile> {
     let client = reqwest::Client::new();
-    let asset_name = format!("rakuyomi-{}.zip", build_name);
+    let asset_name = format!("bobo-{}.zip", build_name);
     let url = format!(
-        "https://github.com/tachibana-shin/rakuyomi/releases/download/v{}/{}",
+        "https://github.com/evanspn/bobo-koreader/releases/download/v{}/{}",
         version, asset_name
     );
 
     info!("Downloading update from: {}", url);
     let response = client
         .get(&url)
-        .header("User-Agent", "rakuyomi")
+        .header("User-Agent", "bobo")
         .timeout(Duration::from_secs(120))
         .send()
         .await
@@ -72,7 +72,7 @@ async fn download_update_zip(version: &str, build_name: &str) -> anyhow::Result<
     for attempt in 0..2 {
         // Create a named temp file for the download
         let mut update_zip_file = tempfile::Builder::new()
-            .prefix("rakuyomi-update-")
+            .prefix("bobo-update-")
             .suffix(".zip")
             .tempfile()
             .context("Could not create named temporary file for download")?;
@@ -82,7 +82,7 @@ async fn download_update_zip(version: &str, build_name: &str) -> anyhow::Result<
             // must re-fetch on retry
             let response_retry = client
                 .get(&url)
-                .header("User-Agent", "rakuyomi")
+                .header("User-Agent", "bobo")
                 .timeout(Duration::from_secs(120))
                 .send()
                 .await

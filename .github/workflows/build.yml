@@ -67,12 +67,12 @@ jobs:
         # version into the build.
         bash scripts/build-all.sh ${{ matrix.target }}
     - name: Package plugin contents
-      run: "cd build && zip -r rakuyomi-${{ matrix.target }}.zip rakuyomi.koplugin"
+      run: "cd build && zip -r bobo-${{ matrix.target }}.zip bobo.koplugin"
     - name: Upload plugin as workflow artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.target }} build
-        path: build/rakuyomi-${{ matrix.target }}.zip
+        path: build/bobo-${{ matrix.target }}.zip
   
   generate-settings-schema:
     runs-on: ubuntu-latest
@@ -81,10 +81,10 @@ jobs:
     - uses: cachix/install-nix-action@v27
     - uses: cachix/cachix-action@v15
       with:
-        name: rakuyomi
+        name: bobo
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - name: Build settings schema
-      run: "nix build .#rakuyomi.settings-schema -o build/settings.schema.json"
+      run: "nix build .#bobo.settings-schema -o build/settings.schema.json"
     - name: Upload plugin as workflow artifact
       uses: actions/upload-artifact@v4
       with:

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help rakuyomi improve
+about: Create a report to help bobo improve
 title: ''
 labels: bug
 assignees: ''

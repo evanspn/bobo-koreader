@@ -10,7 +10,7 @@ local GetText = {
   context = {},
   translation = {},
   current_lang = "C",
-  dirname = require("datastorage"):getFullDataDir() .. "/plugins/rakuyomi.koplugin/l10n",
+  dirname = require("datastorage"):getFullDataDir() .. "/plugins/bobo.koplugin/l10n",
   textdomain = "koreader",
   plural_default = "n != 1",
 }

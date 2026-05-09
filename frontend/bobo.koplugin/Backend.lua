@@ -473,6 +473,17 @@ function Backend.markChapterAsRead(source_id, manga_id, chapter_id, value)
   })
 end
 
+--- Saves the current reading position for a chapter.
+--- @return SuccessfulResponse<nil>|ErrorResponse
+function Backend.saveReadingPosition(source_id, manga_id, chapter_id, page, scroll_offset)
+  return Backend.requestJson({
+    path = "/mangas/" ..
+        source_id .. "/" .. util.urlEncode(manga_id) .. "/chapters/" .. util.urlEncode(chapter_id) .. "/save-position",
+    body = { page = page, scroll_offset = scroll_offset },
+    method = "POST",
+  })
+end
+
 --- Lists information about the installed sources.
 --- @return SuccessfulResponse<SourceInformation[]>|ErrorResponse
 function Backend.listInstalledSources()
@@ -683,12 +694,12 @@ end
 
 --- @class UpdateInfo
 --- @field public available boolean Whether an update is available
---- @field public current_version string The current version of rakuyomi
+--- @field public current_version string The current version of bobo
 --- @field public latest_version string The latest available version
 --- @field public release_url string URL to the release page
 --- @field public auto_installable boolean Whether the update can be automatically installed
 
---- Checks if there is an update available for rakuyomi
+--- Checks if there is an update available for bobo
 --- @return SuccessfulResponse<UpdateInfo>|ErrorResponse
 function Backend.checkForUpdates()
   return Backend.requestJson({

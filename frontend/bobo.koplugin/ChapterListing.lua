@@ -109,7 +109,7 @@ end
 
 function ChapterListing:readSettings()
   if self.r_settings == nil then
-    self.r_settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/rakuyomi_lang.lua")
+    self.r_settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/bobo_lang.lua")
   end
 
   return self.r_settings
@@ -924,6 +924,8 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       path = manga_path,
       on_end_of_book_callback = onEndOfBookCallback,
       chapter = chapter,
+      all_chapters = self.chapters,
+      preload_count = self.preload_count,
       on_close_book_callback = function(chapter)
         Trapper:wrap(function()
           Backend.updateLastReadChapter(
@@ -935,12 +937,6 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
       end,
       on_return_callback = onReturnCallback,
     })
-
-    if self.preload_count > 0 then
-      Trapper:wrap(function()
-        self:preloadChapters(chapter)
-      end)
-    end
 
     self:onClose(false)
   end)

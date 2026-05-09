@@ -1,6 +1,6 @@
-# rakuyomi
+# bobo
 
-**rakuyomi** is a manga reader plugin for [KOReader](https://github.com/koreader/koreader).
+**bobo** is a manga reader plugin for [KOReader](https://github.com/koreader/koreader).
 
 > [!IMPORTANT]
 >
@@ -8,7 +8,7 @@
 >
 > Thank [@hanatsumi](https://github.com/hanatsumi) for the great work!!
 > 
-> `rakuyomi` currently supports all [Aidoku](https://github.com/Aidoku) sources including sources written with legacy SDK or next SDK ([Aidoku Community Sources](https://github.com/Aidoku-Community/sources), [Tachibana Shin Sources](https://github.com/tachibana-shin/aidoku-community-sources)...)
+> `bobo` currently supports all [Aidoku](https://github.com/Aidoku) sources including sources written with legacy SDK or next SDK ([Aidoku Community Sources](https://github.com/Aidoku-Community/sources), [Tachibana Shin Sources](https://github.com/tachibana-shin/aidoku-community-sources)...)
 
 This fork:
 - Added last read time for manga, chapter
@@ -56,9 +56,9 @@ This fork:
 
 ## Installation & Usage
 
-For detailed installation and usage instructions, please check out the [Installation](https://tachibana-shin.github.io/rakuyomi/user-guide/installation/README.html) and [Quickstart](https://tachibana-shin.github.io/rakuyomi/user-guide/quickstart) sections on our user guide!
+For detailed installation and usage instructions, please check out the [Installation](https://tachibana-shin.github.io/bobo/user-guide/installation/README.html) and [Quickstart](https://tachibana-shin.github.io/bobo/user-guide/quickstart) sections on our user guide!
 
 ## Contributing
 
-For information on how to contribute to rakuyomi, please check out the [Setting up the Environment](https://tachibana-shin.github.io/rakuyomi/contributing/setting-up-the-environment.html) section on our guide!
+For information on how to contribute to bobo, please check out the [Setting up the Environment](https://tachibana-shin.github.io/bobo/contributing/setting-up-the-environment.html) section on our guide!
 

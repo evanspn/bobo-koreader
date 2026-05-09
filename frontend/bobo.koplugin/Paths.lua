@@ -5,9 +5,9 @@ local Testing = require("testing")
 
 local Paths = {}
 
---- @return string -- The directory in which Rakuyomi's home folder is located.
+--- @return string -- The directory in which Bobo's home folder is located.
 function Paths.getHomeDirectory()
-  return DataStorage:getDataDir() .. "/rakuyomi"
+  return DataStorage:getDataDir() .. "/bobo"
 end
 
 --- @return string -- The directory in which the plugin is located.

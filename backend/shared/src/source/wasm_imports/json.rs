@@ -32,7 +32,7 @@ impl<'de> Deserialize<'de> for Value {
             type Value = Value;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("any valid JSON value supported by rakuyomi")
+                formatter.write_str("any valid JSON value supported by bobo")
             }
 
             fn visit_unit<E>(self) -> std::result::Result<Self::Value, E> {

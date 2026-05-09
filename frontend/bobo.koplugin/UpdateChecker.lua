@@ -100,7 +100,7 @@ end
 function UpdateChecker:installUpdate(version)
   Trapper:wrap(function()
     local response = LoadingDialog:showAndRun(
-      _("Updating rakuyomi, please wait..."),
+      _("Updating bobo, please wait..."),
       function()
         return Backend.installUpdate(version)
       end

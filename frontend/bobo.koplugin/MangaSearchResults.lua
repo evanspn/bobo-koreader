@@ -102,7 +102,7 @@ function MangaSearchResults:updateItems()
   local MenuItemChoice = MenuItemCover
   if mode == "grid" then
     MenuItemChoice = MenuItemGrid
-    self.grid_columns = G_reader_settings:readSetting("rakuyomi_grid_columns") or 3
+    self.grid_columns = G_reader_settings:readSetting("bobo_grid_columns") or 3
   else
     self.grid_columns = nil
   end

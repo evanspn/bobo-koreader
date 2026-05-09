@@ -16,7 +16,7 @@ local SERVER_COMMAND_OVERRIDE = os.getenv('RAKUYOMI_SERVER_COMMAND_OVERRIDE')
 local REQUEST_COMMAND_WORKING_DIRECTORY = os.getenv('RAKUYOMI_UDS_HTTP_REQUEST_WORKING_DIRECTORY')
 local REQUEST_COMMAND_OVERRIDE = os.getenv('RAKUYOMI_UDS_HTTP_REQUEST_COMMAND_OVERRIDE')
 
-local SOCKET_PATH = '/tmp/rakuyomi.sock'
+local SOCKET_PATH = '/tmp/bobo.sock'
 
 ---@class UnixServer: Server
 ---@field private pid number

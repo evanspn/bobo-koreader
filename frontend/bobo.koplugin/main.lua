@@ -14,18 +14,18 @@ local LibraryView = require("LibraryView")
 local MangaReader = require("MangaReader")
 local Testing = require("testing")
 
-logger.info("Loading Rakuyomi plugin...")
+logger.info("Loading Bobo plugin...")
 local backendInitialized, logs = Backend.initialize()
 
-local Rakuyomi = InputContainer:extend({
-  name = "rakuyomi"
+local Bobo = InputContainer:extend({
+  name = "bobo"
 })
 
 -- We can get initialized from two contexts:
 -- - when the `FileManager` is initialized, we're called
 -- - when the `ReaderUI` is initialized, we're also called
 -- so we should register to the menu accordingly
-function Rakuyomi:init()
+function Bobo:init()
   if self.ui.name == "ReaderUI" then
     MangaReader:initializeFromReaderUI(self.ui)
   else
@@ -36,7 +36,7 @@ function Rakuyomi:init()
   Dispatcher:registerAction("start_library_view", {
     category = "none",
     event = "StartLibraryView",
-    title = _("Rakuyomi"),
+    title = _("Bobo"),
     general = true
   })
 
@@ -44,7 +44,7 @@ function Rakuyomi:init()
   Testing:emitEvent('initialized')
 end
 
-function Rakuyomi:onStartLibraryView()
+function Bobo:onStartLibraryView()
   if self.ui.name == "ReaderUI" then
     MangaReader:initializeFromReaderUI(self.ui)
   else
@@ -58,9 +58,9 @@ function Rakuyomi:onStartLibraryView()
   end
 end
 
-function Rakuyomi:addToMainMenu(menu_items)
-  menu_items.rakuyomi = {
-    text = _("Rakuyomi"),
+function Bobo:addToMainMenu(menu_items)
+  menu_items.bobo = {
+    text = _("Bobo"),
     sorting_hint = "search",
     callback = function()
       if not backendInitialized then
@@ -74,9 +74,9 @@ function Rakuyomi:addToMainMenu(menu_items)
   }
 end
 
-function Rakuyomi:showErrorDialog()
+function Bobo:showErrorDialog()
   ErrorDialog:show(
-    _("Oops!") .. _("Rakuyomi encountered an issue while starting up!") .. "\n" ..
+    _("Oops!") .. _("Bobo encountered an issue while starting up!") .. "\n" ..
     _("Here are some messages that might help identify the problem:") .. "\n\n" ..
     logs,
     function()
@@ -86,13 +86,13 @@ function Rakuyomi:showErrorDialog()
   )
 end
 
-function Rakuyomi:openLibraryView()
+function Bobo:openLibraryView()
   LibraryView:fetchAndShow()
   OfflineAlertDialog:showIfOffline()
 end
 
-function Rakuyomi:openFromToolbar()
+function Bobo:openFromToolbar()
   self:openLibraryView()
 end
 
-return Rakuyomi
+return Bobo

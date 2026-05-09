@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launches KOReader with the rakuyomi plugin.
+# Launches KOReader with the bobo plugin.
 #
 # - The server runs via `cargo run` (recompiles on restart when source changes).
 # - uds_http_request and cbz_metadata_reader are pre-built and copied into the
@@ -16,9 +16,9 @@ KOREADER_BIN="$REPO_ROOT/build/macos/KOReader.app/Contents/MacOS/koreader"
 # setup-macos.sh installs the plugin to the user data dir when it exists (to avoid
 # double-loading), so resolve the effective plugin dir the same way.
 if [[ -d "$HOME/Library/Application Support/koreader" ]]; then
-    PLUGIN_DIR="$HOME/Library/Application Support/koreader/plugins/rakuyomi.koplugin"
+    PLUGIN_DIR="$HOME/Library/Application Support/koreader/plugins/bobo.koplugin"
 else
-    PLUGIN_DIR="$REPO_ROOT/build/macos/KOReader.app/Contents/koreader/plugins/rakuyomi.koplugin"
+    PLUGIN_DIR="$REPO_ROOT/build/macos/KOReader.app/Contents/koreader/plugins/bobo.koplugin"
 fi
 
 if [[ ! -x "$KOREADER_BIN" ]]; then
@@ -30,7 +30,7 @@ fi
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 # Reinstall Lua plugin on every launch so frontend changes are picked up immediately.
-rsync -a --exclude='*_spec.lua' "$REPO_ROOT/frontend/rakuyomi.koplugin/" "$PLUGIN_DIR/"
+rsync -a --exclude='*_spec.lua' "$REPO_ROOT/frontend/bobo.koplugin/" "$PLUGIN_DIR/"
 
 # Build request-path binaries and copy them into the plugin directory.
 # KOReader looks for these at plugin_dir/uds_http_request and plugin_dir/cbz_metadata_reader.

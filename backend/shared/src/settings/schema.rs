@@ -66,7 +66,7 @@ pub enum SearchViewMode {
     Grid,
 }
 
-/// Settings used to configure rakuyomi's behavior.
+/// Settings used to configure bobo's behavior.
 #[derive(Serialize, Deserialize, Default, Clone, Debug, JsonSchema)]
 pub struct Settings {
     /// A list of URLs containing Aidoku-compatible source lists, which will be available

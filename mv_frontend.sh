@@ -1,1 +1,1 @@
-rsync -av frontend/rakuyomi.koplugin/ ~/.config/koreader/plugins/rakuyomi.koplugin/
+rsync -av frontend/bobo.koplugin/ ~/.config/koreader/plugins/bobo.koplugin/

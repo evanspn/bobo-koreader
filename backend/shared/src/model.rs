@@ -133,6 +133,8 @@ pub struct MangaState {
 pub struct ChapterState {
     pub read: bool,
     pub last_read: Option<i64>,
+    pub current_page: Option<i32>,
+    pub scroll_offset: Option<i32>,
 }
 
 pub struct Chapter {

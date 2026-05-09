@@ -174,7 +174,7 @@ function MenuCustom:_recalculateDimen(no_recalculate_dimen)
 
   local available_height = self.inner_dimen.h - self.others_height - Size.line.thin
 
-  self.items_per_page = G_reader_settings:readSetting("rakuyomi_items_per_page")
+  self.items_per_page = G_reader_settings:readSetting("bobo_items_per_page")
   if self.items_per_page == nil or self.items_per_page < 1 then
     self.items_per_page = math.floor(available_height / scale_by_size / 88) -- 64
   end
@@ -183,7 +183,7 @@ function MenuCustom:_recalculateDimen(no_recalculate_dimen)
   local perpage
   local columns = self.grid_columns or 1
   if columns > 1 then
-    local rows = G_reader_settings:readSetting("rakuyomi_grid_rows")
+    local rows = G_reader_settings:readSetting("bobo_grid_rows")
     if rows == nil or rows < 1 then
       rows = math.floor(available_height / ((self.inner_dimen.w / columns) * 4 / 3 + Screen:scaleBySize(44)))
       if rows < 2 then rows = 2 end
