@@ -4,8 +4,8 @@ local rapidjson = require("rapidjson")
 local Paths = require('Paths')
 
 -- Environment variable for overriding the command
-local CBZ_METADATA_READER_COMMAND_OVERRIDE = os.getenv('RAKUYOMI_CBZ_METADATA_READER_COMMAND_OVERRIDE')
-local CBZ_METADATA_READER_COMMAND_WORKING_DIRECTORY = os.getenv('RAKUYOMI_CBZ_METADATA_READER_WORKING_DIRECTORY')
+local CBZ_METADATA_READER_COMMAND_OVERRIDE = os.getenv('BOBO_CBZ_METADATA_READER_COMMAND_OVERRIDE')
+local CBZ_METADATA_READER_COMMAND_WORKING_DIRECTORY = os.getenv('BOBO_CBZ_METADATA_READER_WORKING_DIRECTORY')
 
 local CbzDocument = PdfDocument:extend {
   -- Inherit properties and methods from PdfDocument

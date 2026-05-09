@@ -33,9 +33,9 @@ function Bobo:init()
   end
 
   CbzDocument:register(DocumentRegistry)
-  Dispatcher:registerAction("start_library_view", {
+  Dispatcher:registerAction("bobo_start_library_view", {
     category = "none",
-    event = "StartLibraryView",
+    event = "BoboStartLibraryView",
     title = _("Bobo"),
     general = true
   })
@@ -44,7 +44,7 @@ function Bobo:init()
   Testing:emitEvent('initialized')
 end
 
-function Bobo:onStartLibraryView()
+function Bobo:onBoboStartLibraryView()
   if self.ui.name == "ReaderUI" then
     MangaReader:initializeFromReaderUI(self.ui)
   else
