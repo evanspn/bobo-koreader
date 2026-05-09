@@ -66,6 +66,13 @@ pub enum SearchViewMode {
     Grid,
 }
 
+/// A named user profile. Each profile has its own library and reading history.
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+pub struct UserProfile {
+    pub id: i64,
+    pub name: String,
+}
+
 /// Settings used to configure bobo's behavior.
 #[derive(Serialize, Deserialize, Default, Clone, Debug, JsonSchema)]
 pub struct Settings {
@@ -126,6 +133,23 @@ pub struct Settings {
 
     #[serde(default)]
     pub search_view_mode: SearchViewMode,
+
+    /// Named user profiles. Each profile has its own library and reading history stored in a
+    /// separate database file. If empty, a single "Default" profile (id=1) is assumed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub profiles: Vec<UserProfile>,
+
+    /// The id of the currently active profile. Defaults to 1.
+    #[serde(default = "default_profile_id", skip_serializing_if = "is_default_profile_id")]
+    pub active_profile_id: i64,
+}
+
+fn default_profile_id() -> i64 {
+    1
+}
+
+fn is_default_profile_id(id: &i64) -> bool {
+    *id == 1
 }
 
 fn default_storage_size_limit() -> StorageSizeLimit {

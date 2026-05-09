@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [kobo]
+        target: [kobo, desktop]
     steps:
       - uses: actions/checkout@v4
 

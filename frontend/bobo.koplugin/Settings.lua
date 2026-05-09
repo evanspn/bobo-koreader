@@ -22,6 +22,7 @@ local MovableContainer = require("ui/widget/container/movablecontainer")
 local Backend = require("Backend")
 local ErrorDialog = require("ErrorDialog")
 local SettingItem = require('widgets/SettingItem')
+local Button = require("ui/widget/button")
 
 -- REFACT This is duplicated from `SourceSettings` (pretty much all of it actually)
 local Settings = FocusManager:extend {
@@ -33,6 +34,14 @@ local Settings = FocusManager:extend {
 
 --- @type [string, ValueDefinition][]
 Settings.setting_value_definitions = {
+  {
+    nil,
+    { type = 'divider', title = _("Profiles") }
+  },
+  {
+    nil,
+    { type = 'profiles_button' }
+  },
   {
     nil,
     { type = 'divider', title = _("Library") }
@@ -261,7 +270,22 @@ function Settings:init()
   for _, tuple in ipairs(Settings.setting_value_definitions) do
     local key = tuple[1]
     local definition = tuple[2]
-    if definition.type == 'divider' then
+    if definition.type == 'profiles_button' then
+      local btn = Button:new {
+        text = _("Manage Profiles"),
+        radius = Size.radius.button,
+        bordersize = Size.border.button,
+        padding = Size.padding.button,
+        width = self.item_width,
+        callback = function()
+          local ProfileManager = require("ProfileManager")
+          ProfileManager:fetchAndShow(function()
+            UIManager:setDirty(self, "ui")
+          end)
+        end,
+      }
+      table.insert(vertical_group, btn)
+    elseif definition.type == 'divider' then
       table.insert(vertical_group, TextWidget:new {
         text = definition.title,
         face = Font:getFace("cfont"),
