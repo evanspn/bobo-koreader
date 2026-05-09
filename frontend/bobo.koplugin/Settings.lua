@@ -414,14 +414,22 @@ function Settings:fetchAndShow(on_return_callback)
   local response = Backend.getSettings()
   if response.type == 'ERROR' then
     ErrorDialog:show(response.message)
+    return
   end
 
-  local ui = Settings:new {
-    settings = response.body,
-    on_return_callback = on_return_callback
-  }
-  ui.on_return_callback = on_return_callback
-  UIManager:show(ui)
+  local ok, result = pcall(function()
+    return Settings:new {
+      settings = response.body,
+      on_return_callback = on_return_callback
+    }
+  end)
+
+  if not ok then
+    ErrorDialog:show(_("Settings failed to open") .. ": " .. tostring(result))
+    return
+  end
+
+  UIManager:show(result)
 end
 
 return Settings
