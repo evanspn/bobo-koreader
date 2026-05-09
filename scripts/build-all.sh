@@ -6,10 +6,8 @@ export CROSS_CONTAINER_ENGINE=podman
 
 # --- Mapping build names to actual Rust targets ---
 declare -A TARGETS=(
+  ["kobo"]="arm-unknown-linux-musleabihf"
   ["desktop"]="x86_64-unknown-linux-musl"
-  ["aarch64"]="aarch64-unknown-linux-musl"
-  ["kindle"]="arm-unknown-linux-musleabi"
-  ["kindlehf"]="arm-unknown-linux-musleabihf"
 )
 
 # --- Helper function: build for one profile ---
