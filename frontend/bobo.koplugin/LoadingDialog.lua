@@ -19,9 +19,12 @@ function LoadingDialog:showAndRun(message, runnable, onCancel, onConfirmCancel)
 
   local cancelled = false
   local conConfirmCancel = nil
+  -- Non-cancellable operations are still dismissable so the user has a recovery
+  -- path if the backend hangs. dismissableRunInSubprocess will return completed=false
+  -- in that case and we return a timeout error to the caller instead of asserting.
   local message_dialog = onCancel == nil and InfoMessage:new {
     text = message,
-    dismissable = false,
+    dismissable = true,
   } or ConfirmBox:new {
     text = message,
     icon = "notice-info",
@@ -47,8 +50,11 @@ function LoadingDialog:showAndRun(message, runnable, onCancel, onConfirmCancel)
   UIManager:forceRePaint()
 
   local completed, return_values = Trapper:dismissableRunInSubprocess(runnable, message_dialog)
-  if onCancel == nil then
-    assert(completed, "Expected runnable to run to completion")
+  if onCancel == nil and not completed then
+    -- User dismissed the dialog while the backend was running (e.g. it hung).
+    -- Return an error so callers can surface it rather than leaving the UI frozen.
+    UIManager:close(message_dialog)
+    return { type = 'ERROR', message = _("Request timed out. Please try again.") }, false
   end
 
   if conConfirmCancel ~= nil then

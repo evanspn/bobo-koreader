@@ -71,9 +71,11 @@ function Job:requestCancellation()
   return true
 end
 
+local JOB_MAX_POLL_ATTEMPTS = 300 -- 5 minutes at 1-second intervals
+
 --- @return SuccessfulResponse<unknown>|ErrorResponse
 function Job:runUntilCompletion()
-  while true do
+  for _ = 1, JOB_MAX_POLL_ATTEMPTS do
     local result = self:poll()
 
     if result.type ~= 'PENDING' then
@@ -82,6 +84,8 @@ function Job:runUntilCompletion()
 
     ffiutil.sleep(JOB_POLLING_INTERVAL_SECONDS)
   end
+
+  return { type = 'ERROR', message = 'Job did not complete within the expected time' }
 end
 
 return Job
