@@ -34,3 +34,4 @@ Use conventional commits (`feat:`, `fix:`) — semantic-release derives the vers
 - No upstream branding (tachibana-shin/rakuyomi was the fork source — all URLs point to `evanspn/bobo-koreader`)
 - sqlx query macros require `DATABASE_URL` at compile time; CI sets it to a temp SQLite file
 - Lua tests must run under LuaJIT (`goto` keyword used in `findNextChapter.lua`)
+- **Every new Lua feature or bug fix must include tests** — add a `*_spec.lua` file alongside the module (e.g. `MangaReader_spec.lua` next to `MangaReader.lua`). Run `busted --lua luajit -C frontend/bobo.koplugin .` and confirm all tests pass before pushing.
