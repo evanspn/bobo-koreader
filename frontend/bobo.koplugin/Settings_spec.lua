@@ -78,8 +78,10 @@ local title_bar_stub = stub_class({
 -- is never called. Its new() returns a plain stub table.
 local setting_item_stub = stub_class()
 
--- Global KOReader singletons.
-G_reader_settings = {
+-- Global KOReader singletons.  Must use _G explicitly so the value is
+-- visible to Settings.lua (which accesses it as a global) regardless of
+-- how busted scopes the spec file's environment.
+_G.G_reader_settings = {
   readSetting = function(_, _key, default) return default end,
   saveSetting = function() end,
 }

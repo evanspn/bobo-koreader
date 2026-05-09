@@ -267,7 +267,7 @@ function Settings:init()
     align = "left",
   }
 
-  for _, tuple in ipairs(Settings.setting_value_definitions) do
+  for _i, tuple in ipairs(Settings.setting_value_definitions) do
     local key = tuple[1]
     local definition = tuple[2]
     if definition.type == 'profiles_button' then
