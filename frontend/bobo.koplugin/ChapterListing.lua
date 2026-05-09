@@ -102,10 +102,10 @@ function ChapterListing:init()
 end
 
 function ChapterListing:onClose(call_return)
-  UIManager:close(self)
   if self.on_return_callback and call_return ~= false then
     self.on_return_callback()
   end
+  UIManager:close(self)
 end
 
 function ChapterListing:readSettings()
@@ -957,7 +957,10 @@ function ChapterListing:openMenu()
         text = "← " .. _("Back to library"),
         callback = function()
           UIManager:close(dialog)
-          self:onReturn()
+          UIManager:close(self)
+          -- Bypass the callback chain: go directly to the library.
+          -- Lazy require avoids the circular dependency (LibraryView requires ChapterListing).
+          require("LibraryView"):fetchAndShow()
         end
       },
     },
