@@ -48,8 +48,13 @@ jobs:
           path: ~/.local/share/containers
           key: ${{ runner.os }}-podman-cross-${{ matrix.target }}
 
-      - name: Install cross
-        run: cargo install cross
+      - name: Install cross and sqlx-cli
+        run: cargo install cross sqlx-cli --no-default-features --features sqlite
+
+      - name: Prepare sqlx database
+        env:
+          DATABASE_URL: sqlite:///tmp/bobo-build.db
+        run: cd backend/shared && cargo sqlx db create && cargo sqlx migrate run
 
       - name: Get next version
         id: get-next-version
@@ -60,6 +65,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build plugin
+        env:
+          DATABASE_URL: sqlite:///tmp/bobo-build.db
         run: |
           export SEMANTIC_RELEASE_VERSION="${{ steps.get-next-version.outputs.new-release-git-tag }}"
           bash scripts/build-all.sh ${{ matrix.target }}
