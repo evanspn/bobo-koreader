@@ -1,116 +1,96 @@
-name: "Build"
+name: Release
+
 on:
   push:
-    branches:
-      - main
-  pull_request:
+    branches: [main]
+
 permissions:
   contents: write
   issues: write
   pull-requests: write
+
 jobs:
   build:
+    name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: ["aarch64", "desktop", "kindle", "kindlehf"]
+        target: [aarch64, desktop, kindle, kindlehf]
     steps:
-    - uses: actions/checkout@v3
-      with:
-        persist-credentials: false
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: "lts/*"
+      - uses: actions/checkout@v4
 
-    - name: Install system deps
-      run: sudo apt update && sudo apt install -y pkg-config libfontconfig1-dev libfreetype6-dev podman gettext && echo "CROSS_CONTAINER_ENGINE=podman" >> $GITHUB_ENV
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y pkg-config libfontconfig1-dev libfreetype6-dev podman gettext
+          echo "CROSS_CONTAINER_ENGINE=podman" >> $GITHUB_ENV
 
-    - name: Cache Cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
- 
-    - name: Cache Podman images
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.local/share/containers
-        key: ${{ runner.os }}-podman-cross-${{ matrix.target }}
+      - name: Install Rust 1.91.1
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.91.1
+          profile: minimal
+          override: true
 
-    - name: Install Rust 1.91.1
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: 1.91.1
-        profile: minimal
-        components: rustfmt, clippy
-        override: true
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-${{ matrix.target }}-
 
-    - name: Install cross
-      run: cargo install cross
+      - name: Cache Podman images
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/containers
+          key: ${{ runner.os }}-podman-cross-${{ matrix.target }}
 
-    - name: Get next version
-      run: |
-        npm install -D semantic-release-export-data
-        npx semantic-release --dry-run
-      id: get-next-version
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Build plugin
-      run: |
-        export SEMANTIC_RELEASE_VERSION="${{ steps.get-next-version.outputs.new-release-git-tag }}"
-        # Using `--impure` here kinda sucks, but it's needed so that we can insert the `semantic-release`
-        # version into the build.
-        bash scripts/build-all.sh ${{ matrix.target }}
-    - name: Package plugin contents
-      run: "cd build && zip -r bobo-${{ matrix.target }}.zip bobo.koplugin"
-    - name: Upload plugin as workflow artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.target }} build
-        path: build/bobo-${{ matrix.target }}.zip
-  
-  generate-settings-schema:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: cachix/install-nix-action@v27
-    - uses: cachix/cachix-action@v15
-      with:
-        name: bobo
-        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - name: Build settings schema
-      run: "nix build .#bobo.settings-schema -o build/settings.schema.json"
-    - name: Upload plugin as workflow artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: settings.schema.json
-        path: build/settings.schema.json
-  
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Get next version
+        id: get-next-version
+        run: |
+          npm install -D semantic-release-export-data
+          npx semantic-release --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build plugin
+        run: |
+          export SEMANTIC_RELEASE_VERSION="${{ steps.get-next-version.outputs.new-release-git-tag }}"
+          bash scripts/build-all.sh ${{ matrix.target }}
+
+      - name: Package
+        run: cd build && zip -r bobo-${{ matrix.target }}.zip bobo.koplugin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-build
+          path: build/bobo-${{ matrix.target }}.zip
+
   release:
+    name: Publish release
     runs-on: ubuntu-latest
-    needs: [build, generate-settings-schema]
-    if: ${{ github.ref == 'refs/heads/main' }} 
+    needs: build
     steps:
-    - uses: actions/checkout@v3
-      with:
-        persist-credentials: false
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: "lts/*"
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: build
-        merge-multiple: true
-    - name: Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        npm install -D semantic-release-export-data
-        npx semantic-release
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build
+          merge-multiple: true
+
+      - name: Publish
+        run: |
+          npm install -D semantic-release-export-data
+          npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
