@@ -69,7 +69,7 @@ local function findNextChapter(chapters, current_chapter)
   -- The next chapter should come _before_ the current one in the `chapters` array, as the
   -- source order is from newer chapters -> older chapters.
   local index = findChapterIndex(chapters, current_chapter)
-  assert(index ~= nil)
+  if index == nil then return nil end
 
   if index > 1 then
     return chapters[index - 1]

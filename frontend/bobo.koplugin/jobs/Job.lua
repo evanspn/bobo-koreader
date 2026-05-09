@@ -33,9 +33,9 @@ function Job:poll()
 
   local response = Backend.getJobDetails(self.job_id)
   if response.type == 'ERROR' then
-    self.result = response
-
-    return self.result
+    -- Transport error (network blip, server busy) — don't cache so the next
+    -- poll can retry rather than permanently treating the job as failed.
+    return response
   end
 
   local details = response.body

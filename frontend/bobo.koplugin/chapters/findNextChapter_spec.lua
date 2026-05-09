@@ -78,6 +78,20 @@ describe('findNextChapter', function()
     assert.equal('cool scans', next_chapter.scanlator)
   end)
 
+  it('returns nil instead of crashing when current chapter is not in the list', function()
+    local chapters = {
+      makeChapter({ chapter_num = 2 }),
+      makeChapter({ chapter_num = 1 }),
+    }
+    -- No chapter_num → skips the numeric comparison branch entirely,
+    -- falls through to findChapterIndex. Different manga_id → not found.
+    local orphan = makeChapter({ manga_id = 'other-manga' })
+
+    local result = findNextChapter(chapters, orphan)
+
+    assert.is_nil(result)
+  end)
+
   it('should fallback to source order when chapter has no chapter number', function()
     --- @type Chapter[]
     local chapters = {
