@@ -303,7 +303,7 @@ function Settings:init()
     elseif definition.is_local then
       table.insert(vertical_group, SettingItem:new {
         show_parent = self,
-        width = self.item_width,
+        width = self.item_width - ScrollableContainer:getScrollbarWidth(),
         label = definition.title,
         value_definition = definition,
         value = G_reader_settings:readSetting(key, definition.default),
@@ -319,7 +319,7 @@ function Settings:init()
 
       table.insert(vertical_group, SettingItem:new {
         show_parent = self,
-        width = self.item_width,
+        width = self.item_width - ScrollableContainer:getScrollbarWidth(),
         label = definition.title,
         value_definition = definition,
         value = value,

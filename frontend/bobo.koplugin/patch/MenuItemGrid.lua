@@ -12,6 +12,7 @@ local HorizontalGroup = require("ui/widget/horizontalgroup")
 local HorizontalSpan = require("ui/widget/horizontalspan")
 local OverlapGroup = require("ui/widget/overlapgroup")
 local RightContainer = require("ui/widget/container/rightcontainer")
+local BottomContainer = require("ui/widget/container/bottomcontainer")
 local Geom = require("ui/geometry")
 
 local MenuItemCover = require("patch/MenuItemCover")
@@ -23,6 +24,10 @@ local Screen = Device.screen
 -- saturated enough to read against a warm-light page, dark enough that the
 -- white badge text stays legible.
 local ACCENT_UNREAD = Blitbuffer.ColorRGB24(0xC0, 0x39, 0x2B)
+
+-- Outer card padding inside the cell. Matches the existing _underline_container
+-- inset so cells line up flush across the grid.
+local CARD_INSET = 3
 
 local MenuItemGrid = MenuItemRaw:extend {}
 
@@ -45,41 +50,20 @@ function MenuItemGrid:init()
     },
   }
 
-  local text_height = Screen:scaleBySize(44)
-  local img_width = self.dimen.w - 6
-  local img_height = self.dimen.h - text_height - 12 - 6 -- padding y = 3
+  -- The card now uses the full cell (minus a small inset). Title and
+  -- timestamp overlay on a black strip at the bottom of the cover instead
+  -- of taking their own row underneath, so the cover itself is bigger and
+  -- each cell reads as one unified card.
+  local card_width  = self.dimen.w - 2 * CARD_INSET
+  local card_height = self.dimen.h - 2 * CARD_INSET
 
-  -- Main text (Title)
   self.face = Font:getFace(self.font, self.font_size)
 
-  -- Constrain to the same horizontal slot as the cover so the title doesn't
-  -- bleed past the cell edge. TextWidget truncates with ellipsis at max_width.
-  local title_widget = TextWidget:new {
-    text = self.text,
-    face = self.face,
-    max_width = img_width,
-    padding = 0,
-    bold = true,
-    fgcolor = self.dim and Blitbuffer.COLOR_DARK_GRAY or nil,
-  }
+  local cover_widget = MenuItemCover.genCover(self, card_width, card_height)
 
-  -- Mandatory line (timestamp / source). The unread count moved to a corner
-  -- badge over the cover so it's not duplicated here.
-  local mandatory = self.mandatory_func and self.mandatory_func() or self.mandatory
-  local mandatory_widget
-  if mandatory and mandatory ~= "" then
-    mandatory_widget = TextWidget:new {
-      text = mandatory,
-      face = Font:getFace(self.infont, self.infont_size),
-      bold = false,
-      fgcolor = Blitbuffer.COLOR_DARK_GRAY,
-    }
-  end
+  local overlay_children = { cover_widget }
 
-  local cover_widget = MenuItemCover.genCover(self, img_width, img_height)
-
-  -- If the entry has unread chapters, overlay a small accent-filled badge in
-  -- the cover's top-right corner.
+  -- Top-right unread badge.
   local manga = self.entry and self.entry.manga
   local unread = manga and manga.unread_chapters_count
   if unread and unread > 0 then
@@ -105,8 +89,6 @@ function MenuItemGrid:init()
       },
     }
 
-    -- Right-align the badge in a strip the height of the badge plus the
-    -- desired top inset, so the badge floats in the cover's top-right.
     local badge_h = badge:getSize().h
     local badge_strip = FrameContainer:new {
       bordersize = 0,
@@ -115,52 +97,81 @@ function MenuItemGrid:init()
       padding_top = badge_inset,
       padding_right = badge_inset,
       RightContainer:new {
-        dimen = Geom:new { w = img_width - badge_inset, h = badge_h },
+        dimen = Geom:new { w = card_width - badge_inset, h = badge_h },
         badge,
       },
     }
-
-    cover_widget = OverlapGroup:new {
-      dimen = Geom:new { w = img_width, h = img_height },
-      cover_widget,
-      badge_strip,
-    }
+    table.insert(overlay_children, badge_strip)
   end
 
-  -- Cover and title share one centered VerticalGroup. A small VerticalSpan
-  -- keeps the title from butting against the cover border.
-  local main_content = FrameContainer:new {
+  -- Bottom title + timestamp strip. Overlays the cover so the cover stays
+  -- the visual focus while metadata stays accessible. White text on a solid
+  -- black strip reads cleanly on Kaleido 3.
+  local title_pad_x = Screen:scaleBySize(6)
+  local title_pad_y = Screen:scaleBySize(4)
+  local strip_text_max_width = card_width - 2 * title_pad_x
+
+  local title_widget = TextWidget:new {
+    text = self.text,
+    face = self.face,
+    max_width = strip_text_max_width,
     padding = 0,
-    bordersize = 0,
-    VerticalGroup:new {
-      align = "center",
-      cover_widget,
-      VerticalSpan:new { width = Size.span.vertical_default },
-      title_widget,
-    }
+    bold = true,
+    fgcolor = Blitbuffer.COLOR_WHITE,
   }
 
-  local final_content
-  if mandatory_widget then
-    final_content = VerticalGroup:new {
-      main_content,
-      mandatory_widget
-    }
-  else
-    final_content = main_content
+  local strip_inner = VerticalGroup:new {
+    align = "left",
+    title_widget,
+  }
+
+  local mandatory = self.mandatory_func and self.mandatory_func() or self.mandatory
+  if mandatory and mandatory ~= "" then
+    table.insert(strip_inner, VerticalSpan:new { width = Screen:scaleBySize(2) })
+    table.insert(strip_inner, TextWidget:new {
+      text = mandatory,
+      face = Font:getFace(self.infont, self.infont_size),
+      max_width = strip_text_max_width,
+      padding = 0,
+      bold = false,
+      fgcolor = Blitbuffer.COLOR_WHITE,
+    })
   end
+
+  local title_strip = FrameContainer:new {
+    background = Blitbuffer.COLOR_BLACK,
+    bordersize = 0,
+    margin = 0,
+    width = card_width,
+    padding_left = title_pad_x,
+    padding_right = title_pad_x,
+    padding_top = title_pad_y,
+    padding_bottom = title_pad_y,
+    strip_inner,
+  }
+
+  table.insert(overlay_children, BottomContainer:new {
+    dimen = Geom:new { w = card_width, h = card_height },
+    title_strip,
+  })
+
+  local card_opts = { dimen = Geom:new { w = card_width, h = card_height } }
+  for _, child in ipairs(overlay_children) do
+    table.insert(card_opts, child)
+  end
+  local card = OverlapGroup:new(card_opts)
 
   self._underline_container = FrameContainer:new {
     padding = 0,
     bordersize = 0,
     HorizontalGroup:new {
-      HorizontalSpan:new { width = 3 },
+      HorizontalSpan:new { width = CARD_INSET },
       VerticalGroup:new {
-        VerticalSpan:new { width = 3 },
-        final_content,
-        VerticalSpan:new { width = 3 },
+        VerticalSpan:new { width = CARD_INSET },
+        card,
+        VerticalSpan:new { width = CARD_INSET },
       },
-      HorizontalSpan:new { width = 3 },
+      HorizontalSpan:new { width = CARD_INSET },
     }
   }
 
@@ -168,7 +179,7 @@ function MenuItemGrid:init()
     width = self.dimen.w,
     height = self.dimen.h,
     padding = 0,
-    margin = 0, -- remove margin to ensure full 1/3 width
+    margin = 0,
     color = Blitbuffer.TRANSPARENT,
     bordersize = 0,
     self._underline_container,

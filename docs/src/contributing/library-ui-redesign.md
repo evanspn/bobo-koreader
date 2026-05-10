@@ -55,30 +55,32 @@ Reuse KOReader's `Size.padding.*` and `Size.span.*`; add named multiples in code
 
 ### 1. Cover card (`patch/MenuItemGrid.lua`)
 
+Each cell is a single unified card — the cover fills the whole cell, with metadata overlaid on top. There is no separate title row beneath the cover; this consolidation roughly doubles the cover area in a 3-column portrait grid.
+
 ```
 ┌─────────────────┐
-│ ╔═════════════╗▓│   ← cover (img_width × img_height)
-│ ║             ║▓│     framed with 1px ink_dim border
-│ ║   COVER     ║▓│     drop-shadow: 2-3px offset rule rectangle
-│ ║             ║▓│
-│ ║         ╔══╗║▓│   ← unread badge: top-right, accent fill,
-│ ║         ║33║║▓│     white bold text, only when unread > 0
-│ ║         ╚══╝║▓│
-│ ║▓▓▓▓▓░░░░░░░║▓│   ← progress bar: 3px, ink fill / rule track
-│ ╚═════════════╝▓│     hidden when total_chapters unknown
-│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │
-│  Super Ball Girls │   ← bold title
-│  just now         │   ← timestamp only (badge replaces 🔔33)
+│╔═══════════════╗│   ← cover frame (1px black border) fills the
+│║           ╔══╗║│     entire cell, minus a 3px CARD_INSET
+│║           ║33║║│   ← unread badge: top-right, accent fill,
+│║           ╚══╝║│     white bold text, only when unread > 0
+│║               ║│
+│║     COVER     ║│
+│║               ║│
+│║▓▓▓▓▓░░░░░░░░░░║│   ← progress bar (Phase 3): 3px, ink / rule
+│║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║│   ← title strip: solid black, padded
+│║ Super Ball Gi…║│   ← title (white, bold, ellipsized)
+│║ just now      ║│   ← timestamp (white, smaller)
+│╚═══════════════╝│
 └─────────────────┘
 ```
 
-Key changes vs today:
+Key elements:
 
-- **Frame + drop shadow.** Wrap `cover_widget` in a `FrameContainer` with `bordersize=1, color=bobo.rule`. Behind it, lay a 2px-offset filled rectangle in `bobo.rule` to fake a shadow. On greyscale this looks like a card; on color it stays subtle (the rule grey reads the same).
-- **Unread badge.** Replace the trailing `🔔 33` glyph with a `FrameContainer` positioned via `OverlapGroup` over the cover's top-right. Background `bobo.accent`, white bold text, `bordersize=0`, padding `Size.padding.tiny`. Shape: rounded-rectangle approximation (KOReader has `radius` on `FrameContainer`).
-- **Progress bar.** New 3px-tall row at the bottom of the cover. Fill = `read_chapters / total_chapters` in `bobo.ink`; track = `bobo.rule`. Backend already returns `unread_chapters_count`; we need to surface `total_chapters` (or compute `read = total - unread`) — see [Data wiring](#data-wiring).
-- **Bold title.** Set `bold = true` on the title `TextWidget`. Drop the `🔔 N` from the mandatory line entirely (it's now the badge).
-- **Currently-reading highlight.** If `manga.id == continue_reading_target`, swap the cover frame color to `bobo.accent_alt` and bump `bordersize` to 2. (Optional, behind a setting.)
+- **Cover fills the cell.** `MenuItemCover.genCover` is called with the full `card_width × card_height` (was `card_height - 44 - 18` to reserve a text row underneath). The 1px black border around the cover *is* the card frame.
+- **Unread badge.** `FrameContainer` positioned via `OverlapGroup` + `RightContainer` over the cover's top-right. Background `bobo.accent`, white bold text, `bordersize=0`, `radius=3`. Capped at `99+`.
+- **Title strip overlay.** A black-filled `FrameContainer` with the title (white bold, ellipsized) and timestamp (white regular, smaller) stacked vertically inside it. Wrapped in `BottomContainer` so it sits at the bottom edge of the cover. Solid black reads better than a faux-alpha gradient on Kaleido 3.
+- **Progress bar (Phase 3).** Slot reserved above the title strip; not yet implemented. Fill = `read_chapters / total_chapters` in `bobo.ink`; track = `bobo.rule`. Needs `total_chapters` on the backend response — see [Data wiring](#data-wiring).
+- **Currently-reading highlight (Phase 7).** When implemented, swap the cover frame color to `bobo.accent_alt` and bump `bordersize` to 2.
 
 ### 2. Title bar (`LibraryView:patchTitleBar`)
 
