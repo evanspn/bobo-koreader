@@ -1427,26 +1427,78 @@ impl Database {
     pub async fn find_cached_manga_details(
         &self,
         manga_id: &MangaId,
-    ) -> Result<Option<(crate::source::model::Manga, f64)>> {
+    ) -> Result<Option<crate::model::CachedMangaDetails>> {
         let source_id = manga_id.source_id().value();
         let manga_id = manga_id.value();
 
+        // `per_read`, `chapters_read`, `total_chapters` are computed against
+        // every row in `chapter_informations` for this manga — *not* just the
+        // ones in `chapter_state`. The previous `AVG(cs.read)` form averaged
+        // only over chapters the user had ever opened, so a few-touched manga
+        // could falsely report ~100% completed.
         let row = sqlx::query_as!(
             MangaDetailsRow,
             r#"
-            SELECT 
-                md.*, 
-                COALESCE(AVG(cs.read), 0) AS "per_read: f64",
+            SELECT
+                md.*,
                 COALESCE(
-                    MAX(cs.last_read),
-                    0
-                ) AS "last_read: i64"
+                    CAST((
+                        SELECT COUNT(*)
+                        FROM chapter_informations ci
+                        JOIN chapter_state cs
+                            ON cs.source_id = ci.source_id
+                           AND cs.manga_id = ci.manga_id
+                           AND cs.chapter_id = ci.chapter_id
+                        WHERE ci.source_id = md.source_id
+                          AND ci.manga_id = md.id
+                          AND cs.read = 1
+                    ) AS REAL)
+                    / NULLIF((
+                        SELECT COUNT(*)
+                        FROM chapter_informations ci
+                        WHERE ci.source_id = md.source_id
+                          AND ci.manga_id = md.id
+                    ), 0),
+                    0.0
+                ) AS "per_read: f64",
+                COALESCE((
+                    SELECT COUNT(*)
+                    FROM chapter_informations ci
+                    WHERE ci.source_id = md.source_id
+                      AND ci.manga_id = md.id
+                ), 0) AS "total_chapters: i64",
+                COALESCE((
+                    SELECT COUNT(*)
+                    FROM chapter_informations ci
+                    JOIN chapter_state cs
+                        ON cs.source_id = ci.source_id
+                       AND cs.manga_id = ci.manga_id
+                       AND cs.chapter_id = ci.chapter_id
+                    WHERE ci.source_id = md.source_id
+                      AND ci.manga_id = md.id
+                      AND cs.read = 1
+                ), 0) AS "chapters_read: i64",
+                (
+                    SELECT ci.chapter_number
+                    FROM chapter_informations ci
+                    JOIN chapter_state cs
+                        ON cs.source_id = ci.source_id
+                       AND cs.manga_id = ci.manga_id
+                       AND cs.chapter_id = ci.chapter_id
+                    WHERE ci.source_id = md.source_id
+                      AND ci.manga_id = md.id
+                      AND cs.last_read IS NOT NULL
+                    ORDER BY cs.last_read DESC
+                    LIMIT 1
+                ) AS "current_chapter_number: f64",
+                COALESCE((
+                    SELECT MAX(cs.last_read)
+                    FROM chapter_state cs
+                    WHERE cs.source_id = md.source_id
+                      AND cs.manga_id = md.id
+                ), 0) AS "last_read: i64"
             FROM manga_details md
-            LEFT JOIN chapter_state cs
-                ON cs.source_id = md.source_id
-                AND cs.manga_id = md.id
             WHERE md.source_id = ?1 AND md.id = ?2
-            GROUP BY md.source_id, md.id
             "#,
             source_id,
             manga_id
@@ -1456,8 +1508,17 @@ impl Database {
 
         Ok(row.map(|v| {
             let per_read = v.per_read.unwrap_or(0.0);
+            let chapters_read = v.chapters_read.unwrap_or(0);
+            let total_chapters = v.total_chapters.unwrap_or(0);
+            let current_chapter_number = v.current_chapter_number;
             let manga = v.into();
-            (manga, per_read)
+            crate::model::CachedMangaDetails {
+                manga,
+                per_read,
+                chapters_read,
+                total_chapters,
+                current_chapter_number,
+            }
         }))
     }
 
@@ -2932,6 +2993,9 @@ struct MangaDetailsRow {
     date_added: Option<String>,
 
     pub per_read: Option<f64>,
+    pub total_chapters: Option<i64>,
+    pub chapters_read: Option<i64>,
+    pub current_chapter_number: Option<f64>,
 }
 impl From<MangaDetailsRow> for crate::source::model::Manga {
     fn from(row: MangaDetailsRow) -> Self {
@@ -3125,5 +3189,176 @@ impl From<NotificationInformationRow> for NotificationInformation {
             chapter_number: value.chapter_number.unwrap_or(-1.0),
             created_at: value.created_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::source::model::{MangaContentRating, MangaViewer, PublishingStatus};
+    use tempfile::NamedTempFile;
+
+    async fn test_db() -> (Database, NamedTempFile) {
+        let file = NamedTempFile::new().unwrap();
+        let db = Database::new(file.path()).await.unwrap();
+        (db, file)
+    }
+
+    fn manga_id() -> MangaId {
+        MangaId::from_strings("src".into(), "manga-1".into())
+    }
+
+    fn chapter_info(id: &str, order: i64, chapter_number: Option<f32>) -> ChapterInformation {
+        ChapterInformation {
+            id: ChapterId::new(manga_id(), id.into()),
+            title: Some(format!("Chapter {order}")),
+            scanlator: None,
+            chapter_number,
+            volume_number: None,
+            last_updated: None,
+            thumbnail: None,
+            lang: None,
+            url: None,
+            locked: Some(false),
+        }
+    }
+
+    async fn seed_manga_with_details(db: &Database) {
+        let manga = crate::source::model::Manga {
+            source_id: "src".into(),
+            id: "manga-1".into(),
+            title: Some("Manga 1".into()),
+            author: None,
+            artist: None,
+            description: None,
+            tags: None,
+            cover_url: None,
+            url: None,
+            status: PublishingStatus::Ongoing,
+            nsfw: MangaContentRating::Safe,
+            viewer: MangaViewer::Rtl,
+            last_updated: None,
+            last_opened: None,
+            last_read: None,
+            date_added: None,
+        };
+        db.upsert_cached_manga_details(&manga_id(), &manga)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn per_read_is_zero_when_no_chapters_known() {
+        let (db, _f) = test_db().await;
+        seed_manga_with_details(&db).await;
+
+        let details = db
+            .find_cached_manga_details(&manga_id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(details.per_read, 0.0);
+        assert_eq!(details.total_chapters, 0);
+        assert_eq!(details.chapters_read, 0);
+        assert!(details.current_chapter_number.is_none());
+    }
+
+    #[tokio::test]
+    async fn per_read_is_zero_when_chapters_exist_but_none_read() {
+        let (db, _f) = test_db().await;
+        seed_manga_with_details(&db).await;
+        db.upsert_cached_chapter_informations(
+            &manga_id(),
+            &[
+                chapter_info("ch-1", 0, Some(1.0)),
+                chapter_info("ch-2", 1, Some(2.0)),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let details = db
+            .find_cached_manga_details(&manga_id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(details.per_read, 0.0);
+        assert_eq!(details.total_chapters, 2);
+        assert_eq!(details.chapters_read, 0);
+    }
+
+    #[tokio::test]
+    async fn per_read_uses_total_chapters_not_just_touched_ones() {
+        // The previous SQL averaged AVG(cs.read) over chapter_state rows only.
+        // Here we have 10 chapters total, only 1 marked read — so the percentage
+        // should be 0.1, not 1.0.
+        let (db, _f) = test_db().await;
+        seed_manga_with_details(&db).await;
+
+        let infos: Vec<_> = (0..10)
+            .map(|i| chapter_info(&format!("ch-{i}"), i as i64, Some(i as f32 + 1.0)))
+            .collect();
+        db.upsert_cached_chapter_informations(&manga_id(), &infos)
+            .await
+            .unwrap();
+
+        // Mark just ch-0 as read.
+        db.mark_chapter_as_read(&ChapterId::new(manga_id(), "ch-0".into()), Some(true))
+            .await
+            .unwrap();
+
+        let details = db
+            .find_cached_manga_details(&manga_id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(details.total_chapters, 10);
+        assert_eq!(details.chapters_read, 1);
+        assert!(
+            (details.per_read - 0.1).abs() < 1e-9,
+            "per_read should be 0.1, got {}",
+            details.per_read
+        );
+    }
+
+    #[tokio::test]
+    async fn current_chapter_number_uses_most_recent_last_read() {
+        let (db, _f) = test_db().await;
+        seed_manga_with_details(&db).await;
+        db.upsert_cached_chapter_informations(
+            &manga_id(),
+            &[
+                chapter_info("ch-a", 0, Some(1.0)),
+                chapter_info("ch-b", 1, Some(2.0)),
+                chapter_info("ch-c", 2, Some(3.5)),
+            ],
+        )
+        .await
+        .unwrap();
+
+        // Touch ch-a, then ch-c (later) — current should be ch-c.
+        db.update_last_read_chapter(&ChapterId::new(manga_id(), "ch-a".into()))
+            .await
+            .unwrap();
+        // Sleep just enough that the second timestamp is strictly greater.
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+        db.update_last_read_chapter(&ChapterId::new(manga_id(), "ch-c".into()))
+            .await
+            .unwrap();
+
+        let details = db
+            .find_cached_manga_details(&manga_id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let current = details.current_chapter_number.expect("a current chapter");
+        assert!(
+            (current - 3.5).abs() < 1e-9,
+            "current_chapter_number should be 3.5, got {current}"
+        );
     }
 }

@@ -1,7 +1,12 @@
 use anyhow::Result;
 use tokio_util::sync::CancellationToken;
 
-use crate::{chapter_storage::ChapterStorage, database::Database, model::MangaId, source::Source};
+use crate::{
+    chapter_storage::ChapterStorage,
+    database::Database,
+    model::{CachedMangaDetails, MangaId},
+    source::Source,
+};
 
 pub async fn get_cached_manga_details(
     token: &CancellationToken,
@@ -9,17 +14,17 @@ pub async fn get_cached_manga_details(
     chapter_storage: &ChapterStorage,
     source: &Source,
     id: MangaId,
-) -> Result<Option<(crate::source::model::Manga, f64)>> {
+) -> Result<Option<CachedMangaDetails>> {
     match db.find_cached_manga_details(&id).await? {
-        Some((mut details, per_read)) => {
-            if let Some(url) = &details.cover_url {
+        Some(mut details) => {
+            if let Some(url) = &details.manga.cover_url {
                 let output = chapter_storage
                     .cached_poster(token, &id, || {
                         source.get_image_request(url.to_owned(), None)
                     })
                     .await?;
 
-                details.url = match url::Url::from_file_path(output.clone()) {
+                details.manga.url = match url::Url::from_file_path(output.clone()) {
                     Ok(url) => Some(url),
                     Err(_) => url::Url::from_file_path(output.canonicalize()?)
                         .map_err(|_| {
@@ -32,7 +37,7 @@ pub async fn get_cached_manga_details(
                 };
             }
 
-            Ok(Some((details, per_read)))
+            Ok(Some(details))
         }
         None => Ok(None),
     }

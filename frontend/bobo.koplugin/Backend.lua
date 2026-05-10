@@ -346,7 +346,8 @@ function Backend.refreshChapters(cancel_id, source_id, manga_id)
 end
 
 --- Gets the cached details of a given manga from the database.
---- @return SuccessfulResponse<[MManga, number]>|ErrorResponse
+--- Returns: [manga, per_read (0-1), chapters_read, total_chapters, current_chapter_number?]
+--- @return SuccessfulResponse<[MManga, number, integer, integer, number|nil]>|ErrorResponse
 function Backend.cachedMangaDetails(cancel_id, source_id, manga_id)
   return Backend.requestJson({
     path = "/mangas/" .. source_id .. "/" .. util.urlEncode(manga_id) .. "/details",
