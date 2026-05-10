@@ -55,31 +55,30 @@ Reuse KOReader's `Size.padding.*` and `Size.span.*`; add named multiples in code
 
 ### 1. Cover card (`patch/MenuItemGrid.lua`)
 
-Each cell is a single unified card — the cover fills the whole cell, with metadata overlaid on top. There is no separate title row beneath the cover; this consolidation roughly doubles the cover area in a 3-column portrait grid.
+Each cell is a card: the cover image takes the top portion (with the unread badge floating in its top-right corner), and a tight text band beneath the cover carries the title and timestamp. The earlier title-on-cover overlay was rejected because it ate the bottom of every manga's art — Berserk's sword, the Vagabond seal, the Bleach logo all got obscured. Title text now lives outside the cover entirely.
 
 ```
 ┌─────────────────┐
-│╔═══════════════╗│   ← cover frame (1px black border) fills the
-│║           ╔══╗║│     entire cell, minus a 3px CARD_INSET
-│║           ║33║║│   ← unread badge: top-right, accent fill,
-│║           ╚══╝║│     white bold text, only when unread > 0
+│╔═══════════════╗│   ← cover frame (1px black border)
+│║           ╔══╗║│
+│║           ║33║║│   ← unread badge: cover top-right, accent
+│║           ╚══╝║│     fill, white bold text, only when unread > 0
 │║               ║│
-│║     COVER     ║│
+│║     COVER     ║│   ← cover_height = card_height - text_band_h
 │║               ║│
-│║▓▓▓▓▓░░░░░░░░░░║│   ← progress bar (Phase 3): 3px, ink / rule
-│║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓║│   ← title strip: solid black, padded
-│║ Super Ball Gi…║│   ← title (white, bold, ellipsized)
-│║ just now      ║│   ← timestamp (white, smaller)
+│║               ║│
 │╚═══════════════╝│
+│ Super Ball Gi…  │   ← title: bold black, single line, ellipsized
+│ just now        │   ← timestamp: smaller, dark grey
 └─────────────────┘
 ```
 
 Key elements:
 
-- **Cover fills the cell.** `MenuItemCover.genCover` is called with the full `card_width × card_height` (was `card_height - 44 - 18` to reserve a text row underneath). The 1px black border around the cover *is* the card frame.
-- **Unread badge.** `FrameContainer` positioned via `OverlapGroup` + `RightContainer` over the cover's top-right. Background `bobo.accent`, white bold text, `bordersize=0`, `radius=3`. Capped at `99+`.
-- **Title strip overlay.** A black-filled `FrameContainer` with the title (white bold, ellipsized) and timestamp (white regular, smaller) stacked vertically inside it. Wrapped in `BottomContainer` so it sits at the bottom edge of the cover. Solid black reads better than a faux-alpha gradient on Kaleido 3.
-- **Progress bar (Phase 3).** Slot reserved above the title strip; not yet implemented. Fill = `read_chapters / total_chapters` in `bobo.ink`; track = `bobo.rule`. Needs `total_chapters` on the backend response — see [Data wiring](#data-wiring).
+- **Cover does not get covered.** `MenuItemCover.genCover` is called with `card_width × cover_height`, where `cover_height = card_height − text_band_h`. The 1px black border *around* the cover is the visual top of the card; the text band sits beneath it on the page background, which reads as part of the same cell.
+- **Tight text band.** `text_band_h = 36px` (vs KOReader's 44px default). Title is `cfont` bold; timestamp drops to `infont_size − 2`. Single line each, ellipsized at `card_width − 2 × 4px` padding. Net effect: each cell is ~30% taller cover than the original `MenuItemGrid` layout, but with no overlay.
+- **Unread badge.** `FrameContainer` positioned via `OverlapGroup` + `RightContainer` over the cover's top-right (the OverlapGroup now wraps just the cover, not the whole card). Background `bobo.accent`, white bold text, `bordersize=0`, `radius=3`. Capped at `99+`.
+- **Progress bar (Phase 3).** Will sit at the bottom edge of the cover (1–2px above the cover frame's bottom). Fill = `read_chapters / total_chapters` in `bobo.ink`; track = `bobo.rule`. Needs `total_chapters` on the backend response — see [Data wiring](#data-wiring).
 - **Currently-reading highlight (Phase 7).** When implemented, swap the cover frame color to `bobo.accent_alt` and bump `bordersize` to 2.
 
 ### 2. Title bar (`LibraryView:patchTitleBar`)
