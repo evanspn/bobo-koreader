@@ -1,5 +1,7 @@
 local BaseMenu = require("ui/widget/menu")
 local NetworkMgr = require("ui/network/manager")
+local Screen = require("device").screen
+local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local _ = require("gettext+")
 
@@ -8,6 +10,24 @@ local Icons = require("Icons")
 local Menu = BaseMenu:extend {
   with_context_menu = false,
 }
+
+-- KOReader's BaseMenu:onSetRotationMode reaches through `self._manager.ui.view`
+-- to re-layout the surrounding ReaderUI / FileManager. Bobo's Menu-derived
+-- views are shown standalone via `UIManager:show`, so `_manager` is nil and
+-- that access crashes. Handle rotation ourselves: flip the screen rotation
+-- and let `_recreate_func` rebuild the view at the new dimensions.
+function Menu:onSetRotationMode(new_rotation)
+  if new_rotation == nil or new_rotation == Screen:getRotationMode() then
+    return false
+  end
+  Screen:setRotationMode(new_rotation)
+  if self._recreate_func then
+    UIManager:close(self)
+    self._recreate_func()
+    return true
+  end
+  return false
+end
 
 function Menu:init()
   if self.with_context_menu then
