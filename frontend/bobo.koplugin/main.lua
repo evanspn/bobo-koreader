@@ -12,6 +12,7 @@ local CbzDocument = require("extensions/CbzDocument")
 local ErrorDialog = require("ErrorDialog")
 local LibraryView = require("LibraryView")
 local MangaReader = require("MangaReader")
+local ProfilePicker = require("ProfilePicker")
 local Testing = require("testing")
 
 logger.info("Loading Bobo plugin...")
@@ -87,8 +88,46 @@ function Bobo:showErrorDialog()
 end
 
 function Bobo:openLibraryView()
+  -- Show the profile picker if there's more than one profile and the user
+  -- hasn't already picked the active one in this session. Skipped on
+  -- single-profile installs to keep the cold-start path identical to the
+  -- pre-PR behavior.
+  if not self._profile_picked_this_session then
+    local r = Backend.listProfiles()
+    if r.type == 'SUCCESS' and #r.body > 1 then
+      self:_showProfilePicker(r.body)
+      return
+    end
+  end
   LibraryView:fetchAndShow()
   OfflineAlertDialog:showIfOffline()
+end
+
+--- @private
+function Bobo:_showProfilePicker(profiles)
+  local picker
+  picker = ProfilePicker.show {
+    profiles = profiles,
+    on_select = function(profile)
+      UIManager:close(picker)
+      self._profile_picked_this_session = true
+      if not profile.active then
+        local sw = Backend.switchProfile(profile.id)
+        if sw.type == 'ERROR' then
+          ErrorDialog:show(sw.message)
+          return
+        end
+      end
+      LibraryView:fetchAndShow()
+      OfflineAlertDialog:showIfOffline()
+    end,
+    on_manage = function()
+      UIManager:close(picker)
+      local ProfileManager = require("ProfileManager")
+      -- After managing, re-show the picker so the user still has to choose.
+      ProfileManager:fetchAndShow(function() self:openLibraryView() end)
+    end,
+  }
 end
 
 function Bobo:openFromToolbar()

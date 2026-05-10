@@ -881,7 +881,7 @@ function Backend.removeMangaFromPlaylist(playlist_id, source_id, manga_id)
   })
 end
 
---- @class UserProfile: { id: number, name: string, active: boolean }
+--- @class UserProfile: { id: number, name: string, active: boolean, color: string|nil }
 
 --- Returns all configured user profiles.
 --- @return SuccessfulResponse<UserProfile[]>|ErrorResponse
@@ -889,13 +889,13 @@ function Backend.listProfiles()
   return Backend.requestJson({ path = "/profiles" })
 end
 
---- Creates a new user profile with the given name.
+--- Creates a new user profile with the given name and optional color.
 --- @return SuccessfulResponse<UserProfile>|ErrorResponse
-function Backend.createProfile(name)
+function Backend.createProfile(name, color)
   return Backend.requestJson({
     path = "/profiles",
     method = 'POST',
-    body = { name = name },
+    body = { name = name, color = color },
   })
 end
 
@@ -914,6 +914,22 @@ function Backend.switchProfile(id)
   return Backend.requestJson({
     path = "/profiles/" .. id .. "/switch",
     method = 'POST',
+  })
+end
+
+--- Updates a profile's name and/or color. Pass `nil` for fields you want to leave unchanged.
+--- @param id number
+--- @param name string|nil  -- new name (nil = leave unchanged)
+--- @param color string|nil -- new color id (nil = leave unchanged)
+--- @return SuccessfulResponse<UserProfile>|ErrorResponse
+function Backend.updateProfile(id, name, color)
+  local body = {}
+  if name ~= nil then body.name = name end
+  if color ~= nil then body.color = color end
+  return Backend.requestJson({
+    path = "/profiles/" .. id,
+    method = 'PATCH',
+    body = body,
   })
 end
 

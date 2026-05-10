@@ -1,5 +1,5 @@
 use axum::extract::{Path, State as StateExtractor};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use shared::settings::UserProfile;
@@ -13,6 +13,7 @@ pub fn routes() -> Router<State> {
         .route("/profiles", get(list_profiles))
         .route("/profiles", post(create_profile))
         .route("/profiles/{id}", delete(delete_profile))
+        .route("/profiles/{id}", patch(update_profile))
         .route("/profiles/{id}/switch", post(switch_profile))
 }
 
@@ -21,6 +22,19 @@ struct ProfileResponse {
     id: i64,
     name: String,
     active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+}
+
+impl ProfileResponse {
+    fn from(profile: UserProfile, active_id: i64) -> Self {
+        Self {
+            active: profile.id == active_id,
+            id: profile.id,
+            name: profile.name,
+            color: profile.color,
+        }
+    }
 }
 
 async fn list_profiles(
@@ -32,7 +46,7 @@ async fn list_profiles(
     Json(
         profiles
             .into_iter()
-            .map(|p| ProfileResponse { active: p.id == active_id, id: p.id, name: p.name })
+            .map(|p| ProfileResponse::from(p, active_id))
             .collect(),
     )
 }
@@ -40,15 +54,18 @@ async fn list_profiles(
 #[derive(Deserialize)]
 struct CreateProfileRequest {
     name: String,
+    #[serde(default)]
+    color: Option<String>,
 }
 
 async fn create_profile(
     StateExtractor(State { settings, settings_path, .. }): StateExtractor<State>,
     Json(body): Json<CreateProfileRequest>,
-) -> Result<Json<UserProfile>, AppError> {
+) -> Result<Json<ProfileResponse>, AppError> {
     let mut settings = settings.lock().await;
-    let profile = usecases::create_profile(&mut settings, &settings_path, body.name)?;
-    Ok(Json(profile))
+    let profile = usecases::create_profile(&mut settings, &settings_path, body.name, body.color)?;
+    let active_id = settings.active_profile_id;
+    Ok(Json(ProfileResponse::from(profile, active_id)))
 }
 
 async fn delete_profile(
@@ -58,6 +75,36 @@ async fn delete_profile(
     let mut settings = settings.lock().await;
     usecases::delete_profile(&mut settings, &settings_path, id)?;
     Ok(Json(()))
+}
+
+#[derive(Deserialize)]
+struct UpdateProfileRequest {
+    #[serde(default)]
+    name: Option<String>,
+    /// Use double-Option to distinguish "absent" from "explicitly null" (clear color).
+    #[serde(default, deserialize_with = "deserialize_optional_color")]
+    color: Option<Option<String>>,
+}
+
+fn deserialize_optional_color<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<String>::deserialize(deserializer)?))
+}
+
+async fn update_profile(
+    StateExtractor(State { settings, settings_path, .. }): StateExtractor<State>,
+    Path(id): Path<i64>,
+    Json(body): Json<UpdateProfileRequest>,
+) -> Result<Json<ProfileResponse>, AppError> {
+    let mut settings = settings.lock().await;
+    let profile =
+        usecases::update_profile(&mut settings, &settings_path, id, body.name, body.color)?;
+    let active_id = settings.active_profile_id;
+    Ok(Json(ProfileResponse::from(profile, active_id)))
 }
 
 async fn switch_profile(

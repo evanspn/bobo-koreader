@@ -16,7 +16,7 @@ use crate::state::State;
 use crate::AppError;
 
 fn path_to_file_url(path: &std::path::Path) -> Option<url::Url> {
-    match url::Url::from_file_path(&path) {
+    match url::Url::from_file_path(path) {
         Ok(url) => Some(url),
         Err(_) => match path.canonicalize() {
             Ok(canonical_path) => url::Url::from_file_path(canonical_path).ok(),
