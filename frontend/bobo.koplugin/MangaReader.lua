@@ -23,8 +23,10 @@ local CARRY_KEYS = {
   "kopt_zoom_mode_value",
   "kopt_contrast",
   "kopt_page_gap_height",
-  -- rotation_mode intentionally omitted: chapter advance always resets to
-  -- the user's preferred portrait orientation (see closeReaderUi / show).
+  -- rotation_mode intentionally omitted: each chapter's .sdr sidecar owns its
+  -- own rotation, so KOReader's normal per-document rotation persistence
+  -- applies. Bobo only resets to the user's preferred portrait orientation
+  -- when leaving the reader (see closeReaderUi).
 }
 
 --- @class MangaReader
@@ -92,8 +94,6 @@ function MangaReader:show(options)
     -- sidecar before switching, so KOReader loads them automatically.
     self:carryOverReaderSettings(options.path)
 
-    local Device = require("device")
-
     self.is_switching_document = true
     ReaderUI.instance:switchDocument(options.path)
 
@@ -101,30 +101,8 @@ function MangaReader:show(options)
     -- `onCloseWidget`. Keep Bobo in "showing" state while that happens.
     UIManager:nextTick(function()
       self.is_switching_document = false
-      -- Double nextTick lets KOReader's document open handler run first.
-      -- Reset to preferred portrait rather than carrying the previous chapter's
-      -- rotation — the user can re-rotate within the new chapter if needed.
-      UIManager:nextTick(function()
-        local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-        Device.screen:setRotationMode(orientation == "left_hand" and 2 or 0)
-      end)
     end)
   else
-    -- Write preferred orientation into the sidecar before KOReader opens the
-    -- document for the first time, same as we do in carryOverReaderSettings.
-    -- Guard the whole open/save/flush sequence: show() may run inside a
-    -- Trapper coroutine where uncaught errors are swallowed silently.
-    local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-    local rotation_mode = orientation == "left_hand" and 2 or 0
-    local ok, err = pcall(function()
-      local init_settings = DocSettings:open(options.path)
-      init_settings:saveSetting("rotation_mode", rotation_mode)
-      init_settings:flush()
-    end)
-    if not ok then
-      logger.warn("bobo: failed to write orientation to sidecar at", options.path, "-", err)
-    end
-
     -- took this from opds reader
     local Event = require("ui/event")
     UIManager:broadcastEvent(Event:new("SetupShowReader"))
@@ -291,21 +269,6 @@ function MangaReader:carryOverReaderSettings(new_path)
   if copied > 0 then
     new_settings:flush()
     logger.info("bobo: carried", copied, "reader settings to new chapter")
-  end
-
-  -- Write the preferred portrait orientation directly into the new chapter's
-  -- sidecar so KOReader loads it correctly when the document opens — avoids
-  -- any timing race between our nextTick and KOReader's sidecar-apply pass.
-  -- Guarded: this runs on chapter advance from Trapper-wrapped paths, where
-  -- an uncaught error in saveSetting/flush would be swallowed silently.
-  local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-  local rotation_mode = orientation == "left_hand" and 2 or 0
-  local ok3, err = pcall(function()
-    new_settings:saveSetting("rotation_mode", rotation_mode)
-    new_settings:flush()
-  end)
-  if not ok3 then
-    logger.warn("bobo: failed to write orientation to new sidecar at", new_path, "-", err)
   end
 end
 
