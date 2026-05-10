@@ -1,0 +1,50 @@
+---@diagnostic disable: undefined-global
+local formatStats = require("utils/formatStats")
+
+describe("formatStats.formatChapters", function()
+  it("renders read / total when total > 0", function()
+    assert.equal("5 / 100", formatStats.formatChapters(5, 100))
+    assert.equal("0 / 12", formatStats.formatChapters(0, 12))
+  end)
+
+  it("treats nil chapters_read as zero", function()
+    assert.equal("0 / 6", formatStats.formatChapters(nil, 6))
+  end)
+
+  it("returns em-dash when totals are missing or zero", function()
+    assert.equal("—", formatStats.formatChapters(nil, nil))
+    assert.equal("—", formatStats.formatChapters(0, 0))
+    assert.equal("—", formatStats.formatChapters(3, nil))
+    assert.equal("—", formatStats.formatChapters(3, 0))
+  end)
+end)
+
+describe("formatStats.formatCurrentChapter", function()
+  it("renders whole chapter numbers without decimals", function()
+    assert.equal("Ch. 6", formatStats.formatCurrentChapter(6))
+    assert.equal("Ch. 6", formatStats.formatCurrentChapter(6.0))
+    assert.equal("Ch. 1", formatStats.formatCurrentChapter(1))
+  end)
+
+  it("keeps half-chapter decimals", function()
+    assert.equal("Ch. 6.5", formatStats.formatCurrentChapter(6.5))
+    assert.equal("Ch. 6.25", formatStats.formatCurrentChapter(6.25))
+  end)
+
+  it("returns em-dash for nil chapter number", function()
+    assert.equal("—", formatStats.formatCurrentChapter(nil))
+  end)
+end)
+
+describe("formatStats.formatPercentage", function()
+  it("rounds to the nearest whole percent", function()
+    assert.equal("0\xE2\x80\xAF%", formatStats.formatPercentage(0))
+    assert.equal("50\xE2\x80\xAF%", formatStats.formatPercentage(0.5))
+    assert.equal("83\xE2\x80\xAF%", formatStats.formatPercentage(0.833))
+    assert.equal("100\xE2\x80\xAF%", formatStats.formatPercentage(1))
+  end)
+
+  it("falls back to 0 for nil input", function()
+    assert.equal("0\xE2\x80\xAF%", formatStats.formatPercentage(nil))
+  end)
+end)

@@ -218,3 +218,12 @@ pub struct PlaylistManga {
     pub source_id: String,
     pub manga_id: String,
 }
+
+#[derive(Serialize, Debug, Clone)]
+pub struct CachedMangaDetails {
+    pub manga: crate::source::model::Manga,
+    pub per_read: f64,
+    pub chapters_read: i64,
+    pub total_chapters: i64,
+    pub current_chapter_number: Option<f64>,
+}

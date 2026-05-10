@@ -32,6 +32,7 @@ local LoadingDialog = require("LoadingDialog")
 local Backend = require("Backend")
 local ErrorDialog = require("ErrorDialog")
 local calcLastReadText = require("utils/calcLastReadText")
+local formatStats = require("utils/formatStats")
 
 local function parse_iso8601(str)
   local year, month, day, hour, min, sec =
@@ -60,12 +61,18 @@ end
 --- @field raw_manga Manga
 --- @field manga MManga|nil
 --- @field per_read number|nil
+--- @field chapters_read integer|nil
+--- @field total_chapters integer|nil
+--- @field current_chapter_number number|nil
 --- @field on_return_callback fun()|nil
 local MangaInfoWidget = FocusManager:extend {
   padding = Size.padding.fullscreen,
   raw_manga = nil,
   manga = nil,
   per_read = nil,
+  chapters_read = nil,
+  total_chapters = nil,
+  current_chapter_number = nil,
   on_return_callback = nil,
 }
 
@@ -257,7 +264,7 @@ function MangaInfoWidget:genBookInfoGroup(manga)
     )
   end
   -- progress bar
-  local read_percentage = self.per_read
+  local read_percentage = self.per_read or 0
   local progress_bar = ProgressWidget:new {
     width = math.floor(width * 0.7),
     height = Screen:scaleBySize(10),
@@ -271,9 +278,17 @@ function MangaInfoWidget:genBookInfoGroup(manga)
       progress_bar
     }
   )
-  -- complete text
+  -- progress summary: "37 % • 5 / 100 chapters"
+  local chapters_summary = formatStats.formatChapters(self.chapters_read, self.total_chapters)
+  local complete_text
+  if chapters_summary == "—" then
+    complete_text = T(_("%1 Completed"), formatStats.formatPercentage(read_percentage))
+  else
+    complete_text = T(_("%1 \xE2\x80\xA2 %2 chapters"),
+      formatStats.formatPercentage(read_percentage), chapters_summary)
+  end
   local text_complete = TextWidget:new {
-    text = T(_("%1\xE2\x80\xAF% Completed"), string.format("%1.f", read_percentage * 100)),
+    text = complete_text,
     face = self.small_font_face,
   }
   table.insert(book_meta_info_group,
@@ -297,23 +312,6 @@ function MangaInfoWidget:genBookInfoGroup(manga)
       CenterContainer:new {
         dimen = Geom:new { w = width, h = text_tags:getSize().h },
         text_tags
-      }
-    )
-  end
-
-  -- last read text
-  if manga.last_read ~= nil then
-    local last_read_str = calcLastReadText(parse_iso8601(manga.last_read))
-    local text_last_read = TextWidget:new {
-      text = T(_("Last read: %1"), last_read_str),
-      face = self.small_font_face,
-      width = width,
-      alignment = "right",
-    }
-    table.insert(book_meta_info_group,
-      CenterContainer:new {
-        dimen = Geom:new { w = width, h = text_last_read:getSize().h },
-        text_last_read
       }
     )
   end
@@ -362,68 +360,64 @@ end
 
 --- @param manga MManga
 function MangaInfoWidget:genStatisticsGroup(width, manga)
-  local height = Screen:scaleBySize(60)
+  local last_read_str = manga.last_read
+      and calcLastReadText(parse_iso8601(manga.last_read))
+      or "—"
+  local last_updated_str = manga.last_updated
+      and calcLastReadText(parse_iso8601(manga.last_updated))
+      or "—"
+
+  local row_1 = {
+    { title = _("Read"),     value = formatStats.formatChapters(self.chapters_read, self.total_chapters) },
+    { title = _("Current"),  value = formatStats.formatCurrentChapter(self.current_chapter_number) },
+    { title = _("Last read"), value = last_read_str },
+  }
+  local row_2 = {
+    { title = _("Status"),   value = self:getStatus(manga) },
+    { title = _("NSFW"),     value = self:getNSFW(manga) },
+    { title = _("Updated"),  value = last_updated_str },
+  }
+
+  -- Two stacked rows of three stats each.
+  local row_height = Screen:scaleBySize(60)
+  local stats_height = row_height * 2
   local statistics_container = CenterContainer:new {
-    dimen = Geom:new { w = width, h = height },
+    dimen = Geom:new { w = width, h = stats_height },
   }
 
   local statistics_group = VerticalGroup:new { align = "left" }
 
-  local tile_width = width * (1 / 3)
-  local tile_height = height * (1 / 2)
+  local tile_width = math.floor(width * (1 / 3))
+  local title_tile_height = math.floor(row_height * (1 / 2))
+  local data_tile_height = row_height - title_tile_height
 
-  local titles_group = HorizontalGroup:new {
-    align = "center",
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = _("Status"),
-        face = self.small_font_face,
-      },
-    },
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = _("NSFW"),
-        face = self.small_font_face,
-      },
-    },
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = _("Last Updated"),
-        face = self.small_font_face,
-      }
-    }
-  }
+  local function build_row(row)
+    local titles_group = HorizontalGroup:new { align = "center" }
+    local data_group = HorizontalGroup:new { align = "center" }
+    for _i, stat in ipairs(row) do
+      table.insert(titles_group, CenterContainer:new {
+        dimen = Geom:new { w = tile_width, h = title_tile_height },
+        TextWidget:new {
+          text = stat.title,
+          face = self.small_font_face,
+          fgcolor = Blitbuffer.COLOR_GRAY_5,
+        },
+      })
+      table.insert(data_group, CenterContainer:new {
+        dimen = Geom:new { w = tile_width, h = data_tile_height },
+        TextWidget:new {
+          text = stat.value,
+          face = self.medium_font_face,
+        },
+      })
+    end
+    table.insert(statistics_group, titles_group)
+    table.insert(statistics_group, data_group)
+  end
 
-  local data_group = HorizontalGroup:new {
-    align = "center",
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = self:getStatus(manga),
-        face = self.medium_font_face,
-      },
-    },
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = self:getNSFW(manga),
-        face = self.medium_font_face,
-      },
-    },
-    CenterContainer:new {
-      dimen = Geom:new { w = tile_width, h = tile_height },
-      TextWidget:new {
-        text = manga.last_updated and calcLastReadText(parse_iso8601(manga.last_updated)) or _("N/A"),
-        face = self.medium_font_face,
-      }
-    }
-  }
-
-  table.insert(statistics_group, titles_group)
-  table.insert(statistics_group, data_group)
+  build_row(row_1)
+  table.insert(statistics_group, VerticalSpan:new { width = Size.span.vertical_default })
+  build_row(row_2)
 
   table.insert(statistics_container, statistics_group)
   return statistics_container
@@ -592,6 +586,9 @@ function MangaInfoWidget:fetchAndShow(raw_manga, on_return_callback)
     raw_manga = raw_manga,
     manga = response.body[1],
     per_read = response.body[2],
+    chapters_read = response.body[3],
+    total_chapters = response.body[4],
+    current_chapter_number = response.body[5],
     on_return_callback = on_return_callback,
   }
   UIManager:show(widget)
