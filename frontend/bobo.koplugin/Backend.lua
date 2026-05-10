@@ -677,7 +677,7 @@ end
 --- @return SuccessfulResponse<{path:string,page_count:number,errors:table}>|ErrorResponse
 function Backend.getStoredChapter(source_id, manga_id, chapter_id)
   return Backend.requestJson({
-    path = "/mangas/" .. source_id .. "/" .. manga_id .. "/chapters/" .. chapter_id .. "/stored",
+    path = "/mangas/" .. source_id .. "/" .. util.urlEncode(manga_id) .. "/chapters/" .. util.urlEncode(chapter_id) .. "/stored",
     method = 'GET'
   })
 end
