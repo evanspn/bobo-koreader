@@ -60,16 +60,20 @@ function CustomDialog:init(sel)
     }
   end
 
+  local paddingx4 = self.padding * 4
+  local max_width_item = Screen:getWidth() - paddingx4 - ScrollableContainer:getScrollbarWidth()
   local navbar = HorizontalGroup:new {
     align = "center",
-    TextWidget:new { text = self.title, face = self.face },
+    TextWidget:new {
+      text = self.title,
+      face = self.face,
+      max_width = max_width_item,
+    },
   }
   local body = VerticalGroup:new {
     align = "left"
   }
-  local paddingx4 = self.padding * 4
   local max_height = 0
-  local max_width_item = Screen:getWidth() - paddingx4 - ScrollableContainer:getScrollbarWidth()
   for index, option in ipairs(self.options) do
     local check = self.generate(option, max_width_item, index)
 

@@ -43,10 +43,12 @@ function MenuItemGrid:init()
   -- Main text (Title)
   self.face = Font:getFace(self.font, self.font_size)
 
+  -- Constrain to the same horizontal slot as the cover so the title doesn't
+  -- bleed past the cell edge. TextWidget truncates with ellipsis at max_width.
   local title_widget = TextWidget:new {
     text = self.text,
     face = self.face,
-    max_width = self.dimen.w - 6,
+    max_width = img_width,
     padding = 0,
     bold = self.bold,
     fgcolor = self.dim and Blitbuffer.COLOR_DARK_GRAY or nil,
@@ -74,14 +76,15 @@ function MenuItemGrid:init()
 
   local cover_widget = MenuItemCover.genCover(self, img_width, img_height)
 
+  -- Cover and title share one centered VerticalGroup. A small VerticalSpan
+  -- keeps the title from butting against the cover border.
   local main_content = FrameContainer:new {
     padding = 0,
     bordersize = 0,
     VerticalGroup:new {
-      VerticalGroup:new {
-        align = "center",
-        cover_widget,
-      },
+      align = "center",
+      cover_widget,
+      VerticalSpan:new { width = Size.span.vertical_default },
       title_widget,
     }
   }
