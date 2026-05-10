@@ -96,10 +96,11 @@ end
 
 --- @private
 --- Replace KOReader's pagination chevron row with a persistent action bar
---- (Search · Sort · View · Refresh) plus a small "Page X of Y" label below.
---- The Libra Colour has hardware page-turn buttons, so on-screen chevrons
---- don't earn their footprint; this swap keeps Page X/Y info around but
---- frees the row for actions that previously required opening a modal menu.
+--- (Search · Playlists · View · Refresh · Settings · More · Close) plus a
+--- small "Page X of Y" label below. Sort moved into the More overflow per
+--- user feedback ("I don't need filter that quickly accessible"). The top
+--- bar's hamburger / bell / close also collapsed down here so the page is
+--- one consistent interaction zone.
 function LibraryView:_installActionBar()
   local action_bar = ActionBar:new {
     width = Screen:getWidth(),
@@ -111,9 +112,9 @@ function LibraryView:_installActionBar()
         callback = function() self:openSearchMangasDialog() end,
       },
       {
-        glyph = Icons.FA_FILTER,
-        label = _("Sort"),
-        callback = function() self:openSortDialog() end,
+        glyph = Icons.FA_LIST,
+        label = _("Playlists"),
+        callback = function() self:openPlaylistDialog() end,
       },
       {
         glyph = Icons.FA_TH_LARGE,
@@ -125,6 +126,21 @@ function LibraryView:_installActionBar()
         label = _("Refresh"),
         callback = function() self:refreshAllChapters() end,
       },
+      {
+        glyph = Icons.FA_GEAR,
+        label = _("Settings"),
+        callback = function() self:openSettings() end,
+      },
+      {
+        glyph = Icons.FA_ELLIPSIS_VERTICAL,
+        label = _("More"),
+        callback = function() self:openMenu() end,
+      },
+      {
+        glyph = Icons.FA_REMOVE,
+        label = _("Close"),
+        callback = function() self:onClose() end,
+      },
     },
   }
 
@@ -133,11 +149,38 @@ function LibraryView:_installActionBar()
   -- self.page_info widget object directly; a plain `self.page_info = X`
   -- doesn't propagate to that tree, so the chevron row keeps painting.
   -- Wipe the HorizontalGroup's existing children, then push a single
-  -- VerticalGroup that stacks [action_bar, gap, page_info_text]. Keep
-  -- self.page_info_text intact so BaseMenu:updatePageInfo can still
-  -- update the page label on page change.
+  -- VerticalGroup that stacks [action_bar, gap, page_info_text].
+  --
+  -- KOReader's BaseMenu:_recalculateDimen reserves bottom space using
+  -- ONLY page_info_text:getSize().h — it does NOT consult the parent
+  -- HorizontalGroup. Without intervention the items area extends behind
+  -- the action bar and the bottom row of mangas catches taps meant for
+  -- the bar. Wrap page_info_text in a thin proxy that reports the
+  -- combined height (action bar + gap + original text) so BaseMenu
+  -- carves out the correct amount of room. setText still goes to the
+  -- real Button so updatePageInfo's text update keeps working.
   local page_info = self.page_info
   if not page_info or not self.page_info_text then return end
+  local original_text = self._action_bar_original_text or self.page_info_text
+  self._action_bar_original_text = original_text
+
+  local action_bar_h = action_bar:getSize().h + Screen:scaleBySize(2)
+  self.page_info_text = setmetatable({
+    _inner = original_text,
+    _extra_h = action_bar_h,
+    setText = function(self_, ...) return self_._inner:setText(...) end,
+    getSize = function(self_)
+      local s = self_._inner:getSize()
+      return { w = s.w, h = s.h + self_._extra_h }
+    end,
+    paintTo = function(self_, bb, x, y) return self_._inner:paintTo(bb, x, y) end,
+  }, {
+    -- Forward unrecognised methods/fields (BaseMenu may poke at .dimen,
+    -- :setEnabled, etc.) to the underlying Button so we don't break any
+    -- of its internal bookkeeping.
+    __index = function(t, k) return t._inner[k] end,
+  })
+
   for i = #page_info, 1, -1 do
     page_info[i] = nil
   end
@@ -146,7 +189,7 @@ function LibraryView:_installActionBar()
     align = "center",
     action_bar,
     VerticalSpan:new { width = Screen:scaleBySize(2) },
-    self.page_info_text,
+    original_text,
   })
 end
 
@@ -256,79 +299,22 @@ end
 
 --- @private
 --- @param count_notify number
+--- The title bar is now title-only — every action that lived here (menu
+--- overflow, notification bell, close) moved into the bottom action bar
+--- so the user has one consistent interaction zone. Notification count is
+--- stashed for the Notifications entry inside the More menu.
 function LibraryView:patchTitleBar(count_notify)
-  -- custom
-  local left_icon_size_ratio = self.title_bar.left_icon_size_ratio
-  local right_icon_size_ratio = self.title_bar.right_icon_size_ratio
-  local right_icon_rotation_angle = self.title_bar.right_icon_rotation_angle
+  self._notify_count = count_notify or 0
 
-  local left_icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * left_icon_size_ratio)
-  local right_icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * right_icon_size_ratio)
-  local button_padding = Screen:scaleBySize(11)
-
-  -- Single overflow icon on the left. Playlists and sort live inside the
-  -- menu now (see openMenu), which keeps the title bar from feeling crowded.
-  self.title_bar.left_button = IconButton:new {
-    icon = "appbar.menu",
-    icon_rotation_angle = self.left_icon_rotation_angle,
-    width = left_icon_size,
-    height = left_icon_size,
-    padding = button_padding,
-    padding_bottom = left_icon_size,
-    callback = self.title_bar.left_icon_tap_callback,
-    hold_callback = self.title_bar.left_icon_hold_callback,
-    allow_flash = self.title_bar.left_icon_allow_flash,
-    show_parent = self.title_bar.show_parent,
-  }
-
-  self.title_bar.right_button = HorizontalGroup:new {
-    HorizontalSpan:new {
-      -- extend tap zone of the bell+close cluster on the right
-      width = Screen:getWidth() - button_padding - right_icon_size - button_padding * 2 - right_icon_size - button_padding,
-    },
-    VerticalGroup:new {
-      Button:new {
-        text = Icons.FA_BELL .. count_notify,
-        face = SMALL_FONT_FACE,
-        bordersize = 0,
-        enabled = true,
-        text_font_size = 16,
-        text_font_bold = false,
-        callback = function()
-          Trapper:wrap(function()
-            local onReturnCallback = function()
-              self:fetchAndShow(self.current_playlist)
-            end
-
-            NotificationView:fetchAndShow(onReturnCallback)
-
-            self:onClose()
-          end)
-        end
-      },
-      VerticalSpan:new {
-        width = right_icon_size / 2
-      }
-    },
-    IconButton:new {
-      icon = "close",
-      icon_rotation_angle = right_icon_rotation_angle,
-      width = right_icon_size,
-      height = right_icon_size,
-      padding = button_padding,
-      padding_bottom = right_icon_size,
-      callback = self.title_bar.right_icon_tap_callback,
-      hold_callback = self.title_bar.right_icon_hold_callback,
-    },
-  }
-  --- [1] title
-  --- [2] left button
-  --- [3] right button
+  local empty_left = HorizontalSpan:new { width = 0 }
+  local empty_right = HorizontalSpan:new { width = 0 }
+  self.title_bar.left_button = empty_left
+  self.title_bar.right_button = empty_right
   if self.title_bar[2] ~= nil then
-    self.title_bar[2] = self.title_bar.left_button
+    self.title_bar[2] = empty_left
   end
   if self.title_bar[3] ~= nil then
-    self.title_bar[3] = self.title_bar.right_button
+    self.title_bar[3] = empty_right
   end
 end
 
@@ -814,38 +800,36 @@ function LibraryView:openSortDialog()
 end
 
 --- @private
+--- The "More" overflow opened from the bottom action bar. Search for
+--- mangas, Playlists, Refresh mangas, and Settings live in the bar
+--- itself; this dialog only carries the secondary actions, plus
+--- Notifications (with current unread count) and the items that didn't
+--- earn a dedicated cell (Sort by, Search favorites, Refresh details,
+--- Cleaner, Manage sources, Check for updates, Sync Database).
 function LibraryView:openMenu()
   local dialog
+  local notify_count = self._notify_count or 0
+  local notify_label = notify_count > 0
+    and (_("Notifications") .. " (" .. notify_count .. ")")
+    or _("Notifications")
 
   local buttons = {
     {
       {
-        text = Icons.FA_MAGNIFYING_GLASS .. " " .. _("Search for mangas"),
+        text = Icons.FA_BELL .. " " .. notify_label,
         callback = function()
           UIManager:close(dialog)
-
-          self:openSearchMangasDialog()
+          Trapper:wrap(function()
+            local onReturnCallback = function()
+              self:fetchAndShow(self.current_playlist)
+            end
+            NotificationView:fetchAndShow(onReturnCallback)
+            self:onClose()
+          end)
         end
       },
     },
     {
-      {
-        text = "\u{E644}" .. " " .. _("Search favorites"),
-        callback = function()
-          UIManager:close(dialog)
-
-          self:openSearchFavoritesDialog()
-        end
-      }
-    },
-    {
-      {
-        text = Icons.FA_LIST .. " " .. _("Playlists"),
-        callback = function()
-          UIManager:close(dialog)
-          self:openPlaylistDialog()
-        end
-      },
       {
         text = Icons.FA_FILTER .. " " .. _("Sort by..."),
         callback = function()
@@ -853,57 +837,42 @@ function LibraryView:openMenu()
           self:openSortDialog()
         end
       },
-    },
-    {
       {
-        text = Icons.REFRESHING .. " " .. _("Refresh mangas"),
+        text = "\u{E644}" .. " " .. _("Search favorites"),
         callback = function()
           UIManager:close(dialog)
-
-          self:refreshAllChapters()
+          self:openSearchFavoritesDialog()
         end
       },
+    },
+    {
       {
         text = Icons.REFRESHING .. " " .. _("Refresh details"),
         callback = function()
           UIManager:close(dialog)
-
           self:refreshAllDetails()
         end
       },
-    },
-    {
       {
         text = "\u{e000}" .. " " .. _("Cleaner chapters"),
         callback = function()
           UIManager:close(dialog)
-
           self:openCleanerDialog()
-        end
-      },
-      {
-        text = Icons.FA_PLUG .. " " .. _("Manage sources"),
-        callback = function()
-          UIManager:close(dialog)
-
-          self:openInstalledSourcesListing()
         end
       },
     },
     {
       {
-        text = Icons.FA_GEAR .. " " .. _("Settings"),
+        text = Icons.FA_PLUG .. " " .. _("Manage sources"),
         callback = function()
           UIManager:close(dialog)
-
-          self:openSettings()
+          self:openInstalledSourcesListing()
         end
       },
       {
         text = Icons.FA_ARROW_UP .. " " .. _("Check for updates"),
         callback = function()
           UIManager:close(dialog)
-
           UpdateChecker:checkForUpdates()
         end
       },

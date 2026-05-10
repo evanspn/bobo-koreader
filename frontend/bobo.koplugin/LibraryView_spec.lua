@@ -287,26 +287,57 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.equal("grid", view.library_view_mode)
   end)
 
-  it("openMenu offers a Playlists entry (collapsed from the title bar)", function()
+  it("openMenu (the More overflow) no longer carries items promoted to the bottom action bar", function()
+    -- Search, Playlists, Refresh mangas, and Settings live on the bottom
+    -- action bar now — openMenu is the secondary-action overflow only, so
+    -- those entries should NOT appear duplicated in the dialog.
     local view = make_view()
-    local playlist_calls = 0
-    view.openPlaylistDialog = function() playlist_calls = playlist_calls + 1 end
-
     view:openMenu()
     assert.is_not_nil(last_button_dialog)
 
-    local playlists_btn
+    local function find(label)
+      for _, row in ipairs(last_button_dialog.buttons) do
+        for _, btn in ipairs(row) do
+          if type(btn.text) == "string" and btn.text:find(label, 1, true) then
+            return btn
+          end
+        end
+      end
+      return nil
+    end
+
+    assert.is_nil(find("Search for mangas"), "Search lives on the bottom bar; not in the More overflow")
+    assert.is_nil(find("Playlists"),         "Playlists lives on the bottom bar; not in the More overflow")
+    assert.is_nil(find("Refresh mangas"),    "Refresh lives on the bottom bar; not in the More overflow")
+    -- "Settings" must not appear as a top-level entry, but "Settings" the
+    -- substring shouldn't matter because nothing else uses it.
+    assert.is_nil(find("Settings"), "Settings lives on the bottom bar; not in the More overflow")
+
+    -- These secondary actions stay in the overflow.
+    assert.is_not_nil(find("Sort by..."),         "Sort moved into the overflow per user feedback")
+    assert.is_not_nil(find("Search favorites"),   "Search favorites stays in the overflow")
+    assert.is_not_nil(find("Refresh details"),    "Refresh details stays in the overflow")
+    assert.is_not_nil(find("Cleaner chapters"),   "Cleaner stays in the overflow")
+    assert.is_not_nil(find("Manage sources"),     "Sources management stays in the overflow")
+    assert.is_not_nil(find("Check for updates"),  "Update check stays in the overflow")
+    assert.is_not_nil(find("Sync Database"),      "Sync stays in the overflow")
+  end)
+
+  it("openMenu surfaces the notification entry with the current unread count", function()
+    local view = make_view()
+    view._notify_count = 7
+    view:openMenu()
+
+    local notify_btn
     for _, row in ipairs(last_button_dialog.buttons) do
       for _, btn in ipairs(row) do
-        if type(btn.text) == "string" and btn.text:find("Playlists", 1, true) then
-          playlists_btn = btn
+        if type(btn.text) == "string" and btn.text:find("Notifications", 1, true) then
+          notify_btn = btn
         end
       end
     end
-    assert.is_not_nil(playlists_btn,
-      "openMenu must include a Playlists entry now that the title bar icon is gone")
-
-    playlists_btn.callback()
-    assert.equal(1, playlist_calls)
+    assert.is_not_nil(notify_btn, "openMenu must include a Notifications entry (replaces the title-bar bell)")
+    assert.is_truthy(notify_btn.text:find("(7)", 1, true),
+      "the entry should display the unread count when count > 0")
   end)
 end)
