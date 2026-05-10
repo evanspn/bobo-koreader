@@ -390,6 +390,7 @@ function ProfileManager:_buildAndShow(profiles, on_return_callback)
           text = _("No profiles configured."),
           face = Font:getFace("smallffont"),
           fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+          max_width = max_width,
         }
         tw.dimen = tw:getSize()
         return tw

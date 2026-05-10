@@ -447,20 +447,25 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
     }
 
     wimage:_render()
-    image_size = wimage:getSize()
 
-    wleft = CenterContainer:new {
-      dimen = Geom:new { w = wleft_width, h = wleft_height },
-      FrameContainer:new {
-        width = image_size.w + 2 * border_size,
-        height = image_size.h + 2 * border_size,
-        margin = 0,
-        padding = 0,
-        bordersize = border_size,
-        dim = self.file_deleted,
-        color = Blitbuffer.COLOR_GRAY_9,
+    -- Fixed-size bordered frame so every cover cell renders at identical
+    -- outer dimensions regardless of the source image's aspect ratio. The
+    -- inner CenterContainer letterboxes the (aspect-preserved) image.
+    wleft = FrameContainer:new {
+      width = wleft_width,
+      height = wleft_height,
+      margin = 0,
+      padding = 0,
+      bordersize = border_size,
+      dim = self.file_deleted,
+      color = Blitbuffer.COLOR_GRAY_9,
+      CenterContainer:new {
+        dimen = Geom:new {
+          w = wleft_width - 2 * border_size,
+          h = wleft_height - 2 * border_size,
+        },
         wimage,
-      }
+      },
     }
     -- Let menu know it has some item with images
     self.menu._has_cover_images = true
@@ -478,39 +483,24 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
       return font_size
     end
 
-    local max_w = wleft_width - border_size * 2
-    local max_h = wleft_height - border_size * 2
-
-    local aspect = 2 / 3 -- width / height
-
-    local w_by_height = max_h * aspect
-    local h_by_width = max_w / aspect
-
-    local fake_cover_w, fake_cover_h
-
-    if w_by_height <= max_w then
-      fake_cover_w = w_by_height
-      fake_cover_h = max_h
-    else
-      fake_cover_w = max_w
-      fake_cover_h = h_by_width
-    end
-    wleft = CenterContainer:new {
-      dimen = Geom:new { w = wleft_width, h = wleft_height },
-      FrameContainer:new {
-        width = fake_cover_w + 2 * border_size,
-        height = fake_cover_h + 2 * border_size,
-        margin = 0,
-        padding = 0,
-        bordersize = border_size,
-        dim = self.file_deleted,
-        color = Blitbuffer.COLOR_GRAY_9,
-        CenterContainer:new {
-          dimen = Geom:new { w = fake_cover_w, h = fake_cover_h },
-          TextWidget:new {
-            text = "⛶", -- U+26F6 Square four corners
-            face = Font:getFace("cfont", _fontSize(20)),
-          },
+    -- Fixed-size frame matches the real-cover branch so empty cells line up
+    -- with cover cells in the grid.
+    wleft = FrameContainer:new {
+      width = wleft_width,
+      height = wleft_height,
+      margin = 0,
+      padding = 0,
+      bordersize = border_size,
+      dim = self.file_deleted,
+      color = Blitbuffer.COLOR_GRAY_9,
+      CenterContainer:new {
+        dimen = Geom:new {
+          w = wleft_width - 2 * border_size,
+          h = wleft_height - 2 * border_size,
+        },
+        TextWidget:new {
+          text = "⛶", -- U+26F6 Square four corners
+          face = Font:getFace("cfont", _fontSize(20)),
         },
       },
     }

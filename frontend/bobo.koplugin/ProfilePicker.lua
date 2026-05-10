@@ -132,6 +132,7 @@ function ProfilePicker:init()
   local title = TextWidget:new {
     text = _("Who's reading?"),
     face = Font:getFace("tfont", 28),
+    max_width = Screen:getWidth() - Screen:scaleBySize(40),
   }
 
   local manage_btn = Button:new {

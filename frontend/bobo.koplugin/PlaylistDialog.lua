@@ -324,6 +324,7 @@ function PlaylistDialog:_buildAndShow(playlists, on_select_override, on_return_c
           text = _("No playlists yet."),
           face = Font:getFace("smallffont"),
           fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+          max_width = max_width,
         }
         tw.dimen = tw:getSize()
         return tw

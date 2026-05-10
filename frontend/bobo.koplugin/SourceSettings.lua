@@ -146,6 +146,7 @@ function SourceSettings:init()
           text = def.title,
           face = Font:getFace("cfont"),
           bold = true,
+          max_width = self.item_width,
         })
       end
 

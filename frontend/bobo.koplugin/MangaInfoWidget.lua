@@ -154,6 +154,7 @@ function MangaInfoWidget:genHeader(title)
     text = title,
     face = self.medium_font_face,
     fgcolor = Blitbuffer.COLOR_GRAY_9,
+    max_width = width - 4 * self.padding,
   }
 
   local padding_span = HorizontalSpan:new { width = self.padding }
@@ -275,6 +276,7 @@ function MangaInfoWidget:genBookInfoGroup(manga)
   local text_complete = TextWidget:new {
     text = T(_("%1\xE2\x80\xAF% Completed"), string.format("%1.f", read_percentage * 100)),
     face = self.small_font_face,
+    max_width = width,
   }
   table.insert(book_meta_info_group,
     CenterContainer:new {
@@ -304,11 +306,12 @@ function MangaInfoWidget:genBookInfoGroup(manga)
   -- last read text
   if manga.last_read ~= nil then
     local last_read_str = calcLastReadText(parse_iso8601(manga.last_read))
+    -- TextWidget ignores `width`/`alignment`; use max_width and let the
+    -- enclosing CenterContainer handle horizontal placement.
     local text_last_read = TextWidget:new {
       text = T(_("Last read: %1"), last_read_str),
       face = self.small_font_face,
-      width = width,
-      alignment = "right",
+      max_width = width,
     }
     table.insert(book_meta_info_group,
       CenterContainer:new {
@@ -334,18 +337,29 @@ function MangaInfoWidget:genBookInfoGroup(manga)
   -- cc.loadImage(manga.cover_url)
 
   if thumbnail and thumbnail:sub(1, #"file://") == "file://" then
-    -- Much like BookInfoManager, honor AR here
-    -- local cbb_w, cbb_h = thumbnail:getWidth(), thumbnail:getHeight()
-    -- if cbb_w > img_width or cbb_h > img_height then
-    --   local scale_factor = math.min(img_width / cbb_w, img_height / cbb_h)
-    --   cbb_w = math.min(math.floor(cbb_w * scale_factor) + 1, img_width)
-    --   cbb_h = math.min(math.floor(cbb_h * scale_factor) + 1, img_height)
-    --   thumbnail = RenderImage:scaleBlitBuffer(thumbnail, cbb_w, cbb_h, true)
-    -- end
-    table.insert(book_info_group, ImageWidget:new {
-      file = thumbnail:gsub("^file://", ""),
+    -- Render the cover inside a fixed-size bordered frame and let the
+    -- ImageWidget preserve aspect ratio (`scale_factor = 0`). Without the
+    -- frame, ImageWidget either stretches to width/height or shrinks to fit
+    -- and the surrounding layout shifts depending on cover proportions.
+    local cover_border = Size.border.thin
+    local inner_w = img_width - 2 * cover_border
+    local inner_h = img_height - 2 * cover_border
+    table.insert(book_info_group, FrameContainer:new {
       width = img_width,
       height = img_height,
+      margin = 0,
+      padding = 0,
+      bordersize = cover_border,
+      color = Blitbuffer.COLOR_GRAY_9,
+      CenterContainer:new {
+        dimen = Geom:new { w = inner_w, h = inner_h },
+        ImageWidget:new {
+          file = thumbnail:gsub("^file://", ""),
+          width = inner_w,
+          height = inner_h,
+          scale_factor = 0,
+        },
+      },
     })
   end
 
@@ -379,6 +393,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = _("Status"),
         face = self.small_font_face,
+        max_width = tile_width,
       },
     },
     CenterContainer:new {
@@ -386,6 +401,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = _("NSFW"),
         face = self.small_font_face,
+        max_width = tile_width,
       },
     },
     CenterContainer:new {
@@ -393,6 +409,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = _("Last Updated"),
         face = self.small_font_face,
+        max_width = tile_width,
       }
     }
   }
@@ -404,6 +421,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = self:getStatus(manga),
         face = self.medium_font_face,
+        max_width = tile_width,
       },
     },
     CenterContainer:new {
@@ -411,6 +429,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = self:getNSFW(manga),
         face = self.medium_font_face,
+        max_width = tile_width,
       },
     },
     CenterContainer:new {
@@ -418,6 +437,7 @@ function MangaInfoWidget:genStatisticsGroup(width, manga)
       TextWidget:new {
         text = manga.last_updated and calcLastReadText(parse_iso8601(manga.last_updated)) or _("N/A"),
         face = self.medium_font_face,
+        max_width = tile_width,
       }
     }
   }

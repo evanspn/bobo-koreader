@@ -298,6 +298,7 @@ function Settings:init()
         text = definition.title,
         face = Font:getFace("cfont"),
         bold = true,
+        max_width = self.item_width - ScrollableContainer:getScrollbarWidth(),
       })
     elseif definition.is_local then
       table.insert(vertical_group, SettingItem:new {
