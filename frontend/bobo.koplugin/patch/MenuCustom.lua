@@ -10,6 +10,21 @@ local HorizontalGroup = require("ui/widget/horizontalgroup")
 
 local Screen = Device.screen
 
+-- Cache stdlib math functions as locals. Two reasons:
+--   1. Defensive: a stale install / runtime tamper that nukes math.floor
+--      would crash _recalculateDimen with "attempt to call field 'floor'
+--      (a nil value)" — exactly the rotation crash this file used to have.
+--      Binding at module load keeps a private reference even if the global
+--      `math` table is later mutated.
+--   2. Prevents `Math.floor` typos: optmath (capital `Math`) only exposes
+--      round/roundPercent/roundAwayFromZero, and a previous fix had to
+--      replace a regression where landscape gridded layout used Math.floor.
+--      With `floor` as the local, there's no ambiguous `math` vs `Math` to
+--      get wrong.
+local floor = math.floor
+local ceil  = math.ceil
+assert(floor and ceil, "MenuCustom: math.floor/math.ceil missing at load time")
+
 local MenuCustom = Menu:extend {}
 
 --- @param MenuItem any
@@ -40,7 +55,7 @@ function MenuCustom:updateItems(MenuItem, select_number, no_recalculate_dimen)
 
   local columns = self.grid_columns or 1
   if columns > 1 then
-    local rows = math.ceil(items_nb / columns)
+    local rows = ceil(items_nb / columns)
     for r = 1, rows do
       local row_group = HorizontalGroup:new { align = "center" }
       for c = 1, columns do
@@ -176,7 +191,7 @@ function MenuCustom:_recalculateDimen(no_recalculate_dimen)
 
   self.items_per_page = G_reader_settings:readSetting("bobo_items_per_page")
   if self.items_per_page == nil or self.items_per_page < 1 then
-    self.items_per_page = math.floor(available_height / scale_by_size / 88) -- 64
+    self.items_per_page = floor(available_height / scale_by_size / 88) -- 64
   end
 
   local item_dimen
@@ -185,27 +200,27 @@ function MenuCustom:_recalculateDimen(no_recalculate_dimen)
   if columns > 1 then
     local rows = G_reader_settings:readSetting("bobo_grid_rows")
     if rows == nil or rows < 1 then
-      rows = math.floor(available_height / ((self.inner_dimen.w / columns) * 4 / 3 + Screen:scaleBySize(44)))
+      rows = floor(available_height / ((self.inner_dimen.w / columns) * 4 / 3 + Screen:scaleBySize(44)))
       if rows < 2 then rows = 2 end
     end
 
     if not self.portrait_mode then
       local portrait_available_height = Screen:getWidth() - self.others_height - Size.line.thin
-      local portrait_rows = math.floor(portrait_available_height /
+      local portrait_rows = floor(portrait_available_height /
         ((self.inner_dimen.w / columns) * 4 / 3 + Screen:scaleBySize(44)))
       if portrait_rows < 2 then portrait_rows = 2 end
-      rows = math.floor(available_height / (portrait_available_height / portrait_rows))
+      rows = floor(available_height / (portrait_available_height / portrait_rows))
     end
     self.perpage = rows * columns
     perpage = self.perpage
     item_dimen = Geom:new {
-      w = math.floor(self.inner_dimen.w / columns),
-      h = math.floor(available_height / rows)
+      w = floor(self.inner_dimen.w / columns),
+      h = floor(available_height / rows)
     }
   else
     if not self.portrait_mode then
       local portrait_available_height = Screen:getWidth() - self.others_height - Size.line.thin
-      local portrait_item_height = math.floor(portrait_available_height / self.items_per_page) - Size.line.thin
+      local portrait_item_height = floor(portrait_available_height / self.items_per_page) - Size.line.thin
       self.items_per_page = Math.round(available_height / portrait_item_height)
     end
   end
