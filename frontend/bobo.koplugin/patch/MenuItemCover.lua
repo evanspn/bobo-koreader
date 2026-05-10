@@ -458,7 +458,7 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
       padding = 0,
       bordersize = border_size,
       dim = self.file_deleted,
-      color = Blitbuffer.COLOR_GRAY_9,
+      color = Blitbuffer.COLOR_BLACK,
       CenterContainer:new {
         dimen = Geom:new {
           w = wleft_width - 2 * border_size,
@@ -492,7 +492,7 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
       padding = 0,
       bordersize = border_size,
       dim = self.file_deleted,
-      color = Blitbuffer.COLOR_GRAY_9,
+      color = Blitbuffer.COLOR_BLACK,
       CenterContainer:new {
         dimen = Geom:new {
           w = wleft_width - 2 * border_size,

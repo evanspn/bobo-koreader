@@ -15,3 +15,4 @@
 
 - [Setting up the Environment](./contributing/setting-up-the-environment.md)
 - [KOReader UI Guide](./contributing/koreader-ui-guide.md)
+- [Library UI Redesign](./contributing/library-ui-redesign.md)
