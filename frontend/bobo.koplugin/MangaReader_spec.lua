@@ -597,3 +597,90 @@ describe("MangaReader:onPageUpdate poll throttle", function()
     assert.equal(2, poll_count, "should poll on turn 1 and turn 6")
   end)
 end)
+
+-- ─── chapter advance survives a stale is_showing flag ────────────────────────
+--
+-- Regression: on Kobo, a sleep/wake cycle can leave MangaReader.is_showing
+-- transiently false even though the user is still mid-chapter and bobo's
+-- eventListener is still attached to the live ReaderUI. Reaching the end of
+-- the chapter then used to no-op (and KOReader's default end-of-document
+-- popup would take over) instead of advancing to the next chapter. The
+-- handlers must fire as long as the bobo session state (chapter + callback)
+-- is still in place, regardless of is_showing.
+
+describe("MangaReader:onEndOfBook ignores stale is_showing", function()
+  before_each(reset_manga_reader)
+
+  it("fires the chapter-advance callback when chapter+callback are set, even if is_showing is false", function()
+    local fired = 0
+    MangaReader.is_showing               = false  -- the post-sleep symptom
+    MangaReader.chapter                  = make_chapter("ch1", 1)
+    MangaReader.on_end_of_book_callback  = function() fired = fired + 1 end
+
+    local handled = MangaReader:onEndOfBook()
+
+    assert.equal(1, fired, "chapter-advance callback must run after sleep/wake")
+    assert.is_true(handled, "must return true so KOReader's default end-of-doc popup doesn't fire")
+  end)
+
+  it("does nothing when no callback is set (non-Bobo document)", function()
+    MangaReader.is_showing               = true
+    MangaReader.chapter                  = nil
+    MangaReader.on_end_of_book_callback  = nil
+
+    local handled = MangaReader:onEndOfBook()
+
+    assert.is_nil(handled, "must not consume the event when no Bobo session is active")
+  end)
+
+  it("does nothing when the chapter has been cleared", function()
+    local fired = 0
+    MangaReader.is_showing               = true
+    MangaReader.chapter                  = nil
+    MangaReader.on_end_of_book_callback  = function() fired = fired + 1 end
+
+    local handled = MangaReader:onEndOfBook()
+
+    assert.equal(0, fired)
+    assert.is_nil(handled)
+  end)
+end)
+
+describe("MangaReader:onPageUpdate ignores stale is_showing", function()
+  before_each(function()
+    reset_manga_reader()
+    backend_stub.saveReadingPosition = function() end
+    package.loaded["apps/reader/readerui"].instance = {
+      document = { getPageCount = function() return 10 end },
+      rolling  = nil,
+    }
+  end)
+
+  after_each(function()
+    package.loaded["apps/reader/readerui"].instance = nil
+  end)
+
+  it("still saves position when is_showing is false but chapter is set (post-sleep)", function()
+    local saved_page
+    backend_stub.saveReadingPosition = function(_, _, _, page) saved_page = page end
+
+    MangaReader.is_showing = false  -- the post-sleep symptom
+    MangaReader.chapter    = make_chapter("ch1", 1)
+
+    MangaReader:onPageUpdate(5)
+
+    assert.equal(5, saved_page, "page-update must persist even with stale is_showing")
+  end)
+
+  it("does nothing when there is no chapter (non-Bobo session)", function()
+    local called = false
+    backend_stub.saveReadingPosition = function() called = true end
+
+    MangaReader.is_showing = true
+    MangaReader.chapter    = nil
+
+    MangaReader:onPageUpdate(5)
+
+    assert.is_false(called, "must not save when no Bobo chapter is active")
+  end)
+end)
