@@ -420,10 +420,21 @@ end
 
 --- @private
 function LibraryView:onPrimaryMenuChoice(item)
-  Trapper:wrap(function()
-    --- @type Manga
-    local manga = item.manga
+  --- @type Manga
+  local manga = item.manga
+  if manga == nil then
+    return
+  end
 
+  self:_handleContinueReading(manga)
+end
+
+--- Opens the chapter listing for a manga (the long-press "View All Chapters"
+--- action). Extracted so the tap and long-press paths share one entry point.
+--- @private
+--- @param manga Manga
+function LibraryView:_openChapterListing(manga)
+  Trapper:wrap(function()
     local onReturnCallback = function()
       self:fetchAndShow(self.current_playlist)
     end
@@ -506,10 +517,10 @@ function LibraryView:onContextMenuChoice(item)
     },
     {
       {
-        text = _("Continue Reading"),
+        text = Icons.FA_LIST .. " " .. _("View All Chapters"),
         callback = function()
           UIManager:close(dialog_context_menu)
-          self:_handleContinueReading(manga)
+          self:_openChapterListing(manga)
         end,
       },
     },
