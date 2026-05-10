@@ -362,7 +362,7 @@ describe("MangaReader:show manga-switch job clearing", function()
 
     -- Per koreader-ui-guide.md, KOReader globals must be stubbed with the
     -- `_G.` prefix so the production module sees them across busted's
-    -- sandboxed environment. show() reads `bobo_app_orientation`.
+    -- sandboxed environment. show() may read settings via this global.
     _G.G_reader_settings = { readSetting = function() return nil end }
 
     -- show()'s first-open branch broadcasts SetupShowReader and calls
@@ -440,11 +440,7 @@ describe("MangaReader:show does not write rotation_mode (first-open path)", func
     reset_manga_reader()
     saved_calls, original_docsettings_open = make_recording_docsettings()
 
-    _G.G_reader_settings = {
-      readSetting = function(_, key)
-        if key == "bobo_app_orientation" then return "left_hand" end
-      end,
-    }
+    _G.G_reader_settings = { readSetting = function() return nil end }
 
     package.loaded["ui/event"]                        = { new = function(_, name) return { name = name } end }
     package.loaded["ui/uimanager"].broadcastEvent     = noop
@@ -479,11 +475,7 @@ describe("MangaReader:carryOverReaderSettings does not write rotation_mode", fun
     reset_manga_reader()
     saved_calls, original_docsettings_open = make_recording_docsettings()
 
-    _G.G_reader_settings = {
-      readSetting = function(_, key)
-        if key == "bobo_app_orientation" then return "left_hand" end
-      end,
-    }
+    _G.G_reader_settings = { readSetting = function() return nil end }
 
     package.loaded["apps/reader/readerui"].instance = {
       document     = { file = "/tmp/old.cbz" },
@@ -501,6 +493,55 @@ describe("MangaReader:carryOverReaderSettings does not write rotation_mode", fun
     MangaReader:carryOverReaderSettings("/tmp/new.cbz")
     assert.is_nil(saved_calls.rotation_mode,
       "Chapter advance must not overwrite the new chapter's rotation — KOReader reads it from the sidecar")
+  end)
+end)
+
+-- ─── closeReaderUi inherits whatever rotation the user is in ─────────────────
+--
+-- Pin the new contract: leaving the reader does NOT touch the device rotation.
+-- Whatever orientation KOReader was last in carries over to Bobo's library /
+-- chapter list, matching how every other KOReader plugin behaves.
+
+describe("MangaReader:closeReaderUi does not call setRotationMode", function()
+  local set_rotation_calls
+  local original_filemanager
+  local original_readerui_instance
+
+  before_each(function()
+    reset_manga_reader()
+    set_rotation_calls = 0
+
+    -- Replace the device.screen so we can detect any setRotationMode call.
+    package.loaded["device"] = {
+      screen = {
+        setRotationMode = function() set_rotation_calls = set_rotation_calls + 1 end,
+      },
+    }
+
+    -- Stub FileManager so the require inside closeReaderUi resolves.
+    original_filemanager = package.loaded["apps/filemanager/filemanager"]
+    package.loaded["apps/filemanager/filemanager"] = {
+      instance = nil,
+      showFiles = noop,
+    }
+
+    original_readerui_instance = package.loaded["apps/reader/readerui"].instance
+    package.loaded["apps/reader/readerui"].instance = nil
+
+    _G.G_reader_settings = { readSetting = function() return nil end }
+  end)
+
+  after_each(function()
+    package.loaded["device"] = nil
+    package.loaded["apps/filemanager/filemanager"] = original_filemanager
+    package.loaded["apps/reader/readerui"].instance = original_readerui_instance
+    _G.G_reader_settings = nil
+  end)
+
+  it("does not touch device.screen:setRotationMode when leaving the reader", function()
+    MangaReader:closeReaderUi()
+    assert.equal(0, set_rotation_calls,
+      "closeReaderUi must not change rotation — Bobo follows whatever orientation the user is in")
   end)
 end)
 

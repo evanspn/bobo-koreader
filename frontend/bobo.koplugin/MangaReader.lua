@@ -327,12 +327,6 @@ function MangaReader:closeReaderUi(done_callback)
       ReaderUI.instance:onClose()
     end
 
-    -- Reset to the user's preferred portrait orientation before handing back
-    -- control. The reader may have been rotated for two-page panels.
-    local Device = require("device")
-    local orientation = G_reader_settings:readSetting("bobo_app_orientation") or "right_hand"
-    Device.screen:setRotationMode(orientation == "left_hand" and 2 or 0)
-
     if FileManager.instance ~= nil then
       FileManager.instance:reinit()
     else
