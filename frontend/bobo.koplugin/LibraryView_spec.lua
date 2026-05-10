@@ -121,7 +121,7 @@ package.loaded["Backend"]                     = {
 package.loaded["ErrorDialog"]                 = { show = noop }
 package.loaded["ChapterListing"]              = chapter_listing_stub
 package.loaded["MangaSearchResults"]          = {}
-package.loaded["widgets/Menu"]                = stub_class({ init = noop, updateItems = noop, onSwipe = noop, _recalculateDimen = noop })
+package.loaded["widgets/Menu"]                = stub_class({ init = noop, updateItems = noop, onSwipe = noop, _recalculateDimen = noop, updateOfflineSubtitle = noop })
 package.loaded["Settings"]                    = { setting_value_definitions = {} }
 package.loaded["testing"]                     = { emitEvent = noop, init = noop }
 package.loaded["UpdateChecker"]               = { checkForUpdates = noop }
@@ -245,6 +245,23 @@ describe("LibraryView cover-tap / context-menu wiring", function()
 
     sort_btn.callback()
     assert.equal(1, sort_calls)
+  end)
+
+  it("updateOfflineSubtitle re-installs the action bar after BaseMenu rebuilds page_info", function()
+    local view = make_view()
+    view.page_info_text = { setText = noop }
+    local install_calls = 0
+    view._installActionBar = function() install_calls = install_calls + 1 end
+
+    -- skip_reinit=true: BaseMenu.init isn't re-run, so the action bar
+    -- doesn't need to be rebuilt either.
+    view:updateOfflineSubtitle(true)
+    assert.equal(0, install_calls)
+
+    -- skip_reinit=false (e.g. WiFi connect/disconnect after init): page_info
+    -- gets rebuilt by BaseMenu.init, so the action bar must be re-installed.
+    view:updateOfflineSubtitle(false)
+    assert.equal(1, install_calls)
   end)
 
   it("_cycleViewMode advances through grid -> cover -> base -> grid and persists the choice", function()

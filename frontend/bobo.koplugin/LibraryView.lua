@@ -139,6 +139,17 @@ function LibraryView:_installActionBar()
   }
 end
 
+--- KOReader's Menu:updateOfflineSubtitle re-runs BaseMenu.init when the
+--- network state changes, which rebuilds self.page_info with the original
+--- chevron row and silently wipes our action-bar swap. Re-install after
+--- every re-init so the bar survives WiFi connect/disconnect.
+function LibraryView:updateOfflineSubtitle(skip_reinit)
+  Menu.updateOfflineSubtitle(self, skip_reinit)
+  if not skip_reinit and self.page_info_text then
+    self:_installActionBar()
+  end
+end
+
 --- @private
 --- Cycle library_view_mode through grid → cover → base → grid.
 function LibraryView:_cycleViewMode()
