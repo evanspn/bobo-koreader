@@ -36,4 +36,5 @@ return {
   FA_PLUS              = "\u{f067}",
   FA_PALETTE           = "\u{f53f}",
   FA_CHART_BAR         = "\u{f080}",
+  FA_TH_LARGE          = "\u{f009}",
 }

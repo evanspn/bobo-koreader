@@ -50,6 +50,7 @@ local MenuItemCover = require("patch/MenuItemCover")
 local MenuItemGrid = require("patch/MenuItemGrid")
 local MenuCustom = require("patch/MenuCustom")
 local PlaylistDialog = require("PlaylistDialog")
+local ActionBar = require("widgets/ActionBar")
 
 local DGENERIC_ICON_SIZE = G_defaults:readSetting("DGENERIC_ICON_SIZE")
 local SMALL_FONT_FACE = Font:getFace("smallffont")
@@ -87,9 +88,80 @@ function LibraryView:init()
 
   self:patchTitleBar(0)
   self:fetchCountNotification()
+  self:_installActionBar()
 
   -- fix bottom bar size
   self:updateItems()
+end
+
+--- @private
+--- Replace KOReader's pagination chevron row with a persistent action bar
+--- (Search · Sort · View · Refresh) plus a small "Page X of Y" label below.
+--- The Libra Colour has hardware page-turn buttons, so on-screen chevrons
+--- don't earn their footprint; this swap keeps Page X/Y info around but
+--- frees the row for actions that previously required opening a modal menu.
+function LibraryView:_installActionBar()
+  local action_bar = ActionBar:new {
+    width = Screen:getWidth(),
+    show_parent = self,
+    actions = {
+      {
+        glyph = Icons.FA_MAGNIFYING_GLASS,
+        label = _("Search"),
+        callback = function() self:openSearchMangasDialog() end,
+      },
+      {
+        glyph = Icons.FA_FILTER,
+        label = _("Sort"),
+        callback = function() self:openSortDialog() end,
+      },
+      {
+        glyph = Icons.FA_TH_LARGE,
+        label = _("View"),
+        callback = function() self:_cycleViewMode() end,
+      },
+      {
+        glyph = Icons.REFRESHING,
+        label = _("Refresh"),
+        callback = function() self:refreshAllChapters() end,
+      },
+    },
+  }
+
+  -- Keep self.page_info_text so KOReader's BaseMenu:updatePageInfo can still
+  -- update the page text on page change. Replace self.page_info itself with
+  -- a stack of [action bar, small gap, page label] — the chevrons are gone.
+  self.page_info = VerticalGroup:new {
+    align = "center",
+    action_bar,
+    VerticalSpan:new { width = Screen:scaleBySize(2) },
+    self.page_info_text,
+  }
+end
+
+--- @private
+--- Cycle library_view_mode through grid → cover → base → grid.
+function LibraryView:_cycleViewMode()
+  Trapper:wrap(function()
+    local response = Backend.getSettings()
+    if response.type == 'ERROR' then
+      ErrorDialog:show(response.message)
+      return
+    end
+    local settings = response.body
+    local current = settings.library_view_mode or "cover"
+    local next_mode = ({ grid = "cover", cover = "base", base = "grid" })[current] or "grid"
+    settings.library_view_mode = next_mode
+
+    local set_response = Backend.setSettings(settings)
+    if set_response.type == 'ERROR' then
+      ErrorDialog:show(set_response.message)
+      return
+    end
+
+    self.library_view_mode = next_mode
+    self:updateItems()
+  end)
 end
 
 --- @private
@@ -163,7 +235,8 @@ function LibraryView:patchTitleBar(count_notify)
 
   self.title_bar.right_button = HorizontalGroup:new {
     HorizontalSpan:new {
-      width = Screen:getWidth() - button_padding - right_icon_size - button_padding * 2 - right_icon_size - button_padding * 2 - right_icon_size - button_padding, -- extend button tap zone
+      -- extend tap zone of the bell+close cluster on the right
+      width = Screen:getWidth() - button_padding - right_icon_size - button_padding * 2 - right_icon_size - button_padding,
     },
     VerticalGroup:new {
       Button:new {
@@ -188,16 +261,6 @@ function LibraryView:patchTitleBar(count_notify)
       VerticalSpan:new {
         width = right_icon_size / 2
       }
-    },
-    IconButton:new {
-      icon = "appbar.search",
-      width = right_icon_size,
-      height = right_icon_size,
-      padding = button_padding,
-      padding_bottom = right_icon_size,
-      callback = function()
-        self:openSearchMangasDialog()
-      end,
     },
     IconButton:new {
       icon = "close",
