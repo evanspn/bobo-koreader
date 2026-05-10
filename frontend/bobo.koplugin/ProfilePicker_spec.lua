@@ -73,7 +73,11 @@ package.loaded["ui/size"]                                 = { padding = { button
 package.loaded["ui/widget/textwidget"]                    = stub_class({
   getSize = function() return { w = 50, h = 20 } end,
 })
-package.loaded["ui/uimanager"]                            = { show = noop, close = noop }
+local close_calls = {}
+package.loaded["ui/uimanager"] = {
+  show  = noop,
+  close = function(_, w) table.insert(close_calls, w) end,
+}
 package.loaded["ui/widget/verticalgroup"]                 = stub_class({
   getSize = function() return { w = 100, h = 150 } end,
 })
@@ -139,6 +143,56 @@ describe("ProfilePicker cell tap dispatch", function()
     -- would freeze the range at the cell's pre-paint position (0, 0).
     local first_range = cell.ges_events.Tap[1]
     assert.is_function(first_range.range)
+  end)
+end)
+
+describe("ProfilePicker self-close on tap", function()
+  -- Regression test: ProfilePicker must close itself when a cell is tapped
+  -- (and when "Manage profiles" is tapped) instead of relying on the caller
+  -- to close it. Without this, a rotation/resize-spawned picker (created
+  -- by _recreate) is orphaned: the caller still holds the original picker
+  -- reference, so closing on user select hits the wrong instance, and the
+  -- on-screen picker is left blocking KOReader after the plugin exits.
+  before_each(function()
+    close_calls = {}
+    -- Re-bind the recorder because the package.loaded reference is stable
+    -- but we replaced the local table on require.
+    package.loaded["ui/uimanager"].close = function(_, w) table.insert(close_calls, w) end
+  end)
+
+  it("closes self before invoking on_select when a cell is tapped", function()
+    local select_seen
+    local picker = ProfilePicker:new {
+      profiles = { { id = 7, name = "Carol" } },
+      on_select = function(p) select_seen = p end,
+    }
+    local row = picker[1][1][1][3]
+    local cell = row[1]
+
+    cell:onTap()
+
+    assert.is_true(#close_calls >= 1, "expected UIManager:close to fire on cell tap")
+    assert.equal(picker, close_calls[1],
+      "the picker that received the tap must close itself, not some other widget")
+    assert.is_table(select_seen, "on_select must still fire after self-close")
+    assert.equal(7, select_seen.id)
+  end)
+
+  it("closes self before invoking on_manage when the manage button is tapped", function()
+    local manage_seen = false
+    local picker = ProfilePicker:new {
+      profiles = { { id = 1, name = "Bob" } },
+      on_manage = function() manage_seen = true end,
+    }
+    -- body = VerticalGroup{ title, span, row, span, manage_btn }
+    local body = picker[1][1][1]
+    local manage_btn = body[5]
+
+    manage_btn.callback()
+
+    assert.is_true(#close_calls >= 1, "expected UIManager:close to fire on manage tap")
+    assert.equal(picker, close_calls[1])
+    assert.is_true(manage_seen, "on_manage must still fire after self-close")
   end)
 end)
 
