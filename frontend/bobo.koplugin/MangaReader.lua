@@ -171,7 +171,10 @@ end
 --- @private
 --- @param new_page number
 function MangaReader:onPageUpdate(new_page)
-  if not self.is_showing or not self.chapter then return end
+  -- Gate on the chapter, not is_showing: the latter can be transiently cleared
+  -- by a stray onCloseWidget (e.g. via the Kobo sleep/wake path) even though the
+  -- eventListener is still attached and the user is still mid-chapter.
+  if not self.chapter then return end
   if new_page == self._last_saved_page then return end
 
   self._last_saved_page = new_page
@@ -339,11 +342,16 @@ end
 
 --- To be called when the last page of the manga is read.
 function MangaReader:onEndOfBook()
-  if self.is_showing then
+  -- Gate on the callback, not is_showing. The eventListener is only attached
+  -- for Bobo-opened documents (initializeFromReaderUI guards that), so if our
+  -- handler is firing at all, it's a Bobo chapter — even when is_showing got
+  -- transiently cleared (e.g. on the Kobo sleep/wake path), the user still
+  -- expects the chapter advance to fire.
+  if self.on_end_of_book_callback and self.chapter then
     logger.info("Got end of book")
 
     -- Trigger another preload pass — the next chapter may now be in range
-    if self.preload_count > 0 and self.chapter then
+    if self.preload_count > 0 then
       self:startPreloading(self.chapter)
     end
 
