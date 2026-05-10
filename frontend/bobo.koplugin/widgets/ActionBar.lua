@@ -98,7 +98,7 @@ function ActionBar:_buildCell(action, cell_width, padding)
   local cell_height = stack:getSize().h + 2 * padding
 
   local cell = InputContainer:new {
-    dimen = Geom:new { w = cell_width, h = cell_height },
+    dimen = Geom:new { x = 0, y = 0, w = cell_width, h = cell_height },
     CenterContainer:new {
       dimen = Geom:new { w = cell_width, h = cell_height },
       stack,
@@ -112,6 +112,16 @@ function ActionBar:_buildCell(action, cell_width, padding)
       },
     },
   }
+  -- WidgetContainer:paintTo doesn't update self.dimen.x/y for InputContainer
+  -- subclasses laid out by HorizontalGroup, so the lazy GestureRange above
+  -- would otherwise stay anchored at (0, 0) — taps would either miss or
+  -- fall through to the manga rows above. Track the actual paint
+  -- coordinates here so the range covers the cell's real screen rect.
+  cell.paintTo = function(self_, bb, x, y)
+    self_.dimen.x = x
+    self_.dimen.y = y
+    self_[1]:paintTo(bb, x, y)
+  end
   cell.onTap = function()
     action.callback()
     -- Force a repaint so the user sees the action take effect on slow
