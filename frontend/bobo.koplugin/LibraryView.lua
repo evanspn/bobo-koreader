@@ -408,6 +408,12 @@ function LibraryView:fetchAndShow(playlist, on_after_open)
     page = self.page,
     library_view_mode = settings.body.library_view_mode,
     current_playlist = self.current_playlist,
+    -- KOReader's BaseMenu rotation handler is a no-op without
+    -- `_recreate_func`. Provide one so the library re-fetches and
+    -- re-renders for the new orientation when the device rotates.
+    _recreate_func = function()
+      self:fetchAndShow(playlist, on_after_open)
+    end,
   })
 
   self.current_playlist = old
