@@ -424,12 +424,25 @@ function LibraryView:fetchAndShow(playlist, on_after_open)
   Testing:emitEvent('library_view_shown')
 end
 
+--- Tapping a cover jumps straight into the continue-reading flow.
+--- The full chapter list is reachable via the context menu's
+--- "View All Chapters" entry.
 --- @private
 function LibraryView:onPrimaryMenuChoice(item)
-  Trapper:wrap(function()
-    --- @type Manga
-    local manga = item.manga
+  --- @type Manga
+  local manga = item.manga
+  if manga == nil then
+    return
+  end
+  self:_handleContinueReading(manga)
+end
 
+--- Opens the chapter listing for `manga`. Used by the context-menu
+--- "View All Chapters" button (and previously by cover taps).
+--- @private
+--- @param manga Manga
+function LibraryView:_handleViewAllChapters(manga)
+  Trapper:wrap(function()
     local onReturnCallback = function()
       self:fetchAndShow(self.current_playlist)
     end
@@ -512,10 +525,10 @@ function LibraryView:onContextMenuChoice(item)
     },
     {
       {
-        text = _("Continue Reading"),
+        text = _("View All Chapters"),
         callback = function()
           UIManager:close(dialog_context_menu)
-          self:_handleContinueReading(manga)
+          self:_handleViewAllChapters(manga)
         end,
       },
     },
