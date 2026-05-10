@@ -9,6 +9,7 @@ local OfflineAlertDialog = require("OfflineAlertDialog")
 
 local Backend = require("Backend")
 local CbzDocument = require("extensions/CbzDocument")
+local CrashReporter = require("CrashReporter")
 local ErrorDialog = require("ErrorDialog")
 local LibraryView = require("LibraryView")
 local MangaReader = require("MangaReader")
@@ -76,13 +77,20 @@ function Bobo:addToMainMenu(menu_items)
 end
 
 function Bobo:showErrorDialog()
+  local message = _("Oops!") .. _("Bobo encountered an issue while starting up!") .. "\n" ..
+      _("Here are some messages that might help identify the problem:") .. "\n\n" ..
+      logs
   ErrorDialog:show(
-    _("Oops!") .. _("Bobo encountered an issue while starting up!") .. "\n" ..
-    _("Here are some messages that might help identify the problem:") .. "\n\n" ..
-    logs,
+    message,
     function()
       Backend.cleanup()
       backendInitialized, logs = Backend.initialize()
+    end,
+    function()
+      CrashReporter.showQrFor {
+        title = "Bobo failed to start",
+        body  = "Bobo's backend failed to start. Logs:\n\n```\n" .. (logs or "") .. "\n```",
+      }
     end
   )
 end
