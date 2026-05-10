@@ -213,7 +213,13 @@ function MangaSearchResults:searchAndShow(search_text, exclude, onReturnCallback
     results = results,
     on_return_callback = onReturnCallback,
     covers_fullscreen = true, -- hint for UIManager:_repaint()
-    page = self.page
+    page = self.page,
+    -- KOReader's BaseMenu rotation handler is a no-op without
+    -- `_recreate_func`. Wire one so the search results re-render
+    -- for the new orientation on rotation.
+    _recreate_func = function()
+      MangaSearchResults:searchAndShow(search_text, exclude, onReturnCallback)
+    end,
   }
   ui.on_return_callback = onReturnCallback
   UIManager:show(ui)

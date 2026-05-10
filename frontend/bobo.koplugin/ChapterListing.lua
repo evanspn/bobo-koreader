@@ -469,6 +469,12 @@ function ChapterListing:fetchAndShow(manga, onReturnCallback, accept_cached_resu
     page = self.page,
     preload_count = settings.preload_chapters,
     preload_on_progress = settings.preload_on_chapter_progress or false,
+    -- KOReader's BaseMenu rotation handler is a no-op without
+    -- `_recreate_func`. Provide one so the chapter list re-renders
+    -- for the new orientation when the device rotates.
+    _recreate_func = function()
+      ChapterListing:fetchAndShow(manga, onReturnCallback, accept_cached_results)
+    end,
   }
   ui.on_return_callback = onReturnCallback
   UIManager:show(ui)

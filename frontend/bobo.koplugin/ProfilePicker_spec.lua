@@ -141,3 +141,64 @@ describe("ProfilePicker cell tap dispatch", function()
     assert.is_function(first_range.range)
   end)
 end)
+
+describe("ProfilePicker rotation handling", function()
+  before_each(function()
+    -- The Device stub must report a stable rotation so onSetRotationMode
+    -- can detect that "new rotation differs from current" and trigger a
+    -- reshow.
+    package.loaded["device"].screen.getRotationMode = function() return 0 end
+    package.loaded["device"].screen.setRotationMode = function() end
+  end)
+
+  it("ProfilePicker.show stashes a _recreate closure", function()
+    -- The closure is what onSetRotationMode / onScreenResize call to
+    -- rebuild the widget against the new screen dimensions. Without it,
+    -- the picker's old layout sticks around after rotation.
+    local opts = { profiles = { { id = 1, name = "Bob" } }, on_select = noop }
+    local picker = ProfilePicker.show(opts)
+    assert.is_function(picker._recreate)
+  end)
+
+  it("onSetRotationMode triggers a reshow when rotation actually changes", function()
+    local picker = ProfilePicker:new {
+      profiles = { { id = 1, name = "Bob" } },
+      on_select = noop,
+    }
+    local recreate_calls = 0
+    picker._recreate = function() recreate_calls = recreate_calls + 1 end
+
+    local handled = picker:onSetRotationMode(1) -- 1 ≠ 0 → real change
+    assert.is_true(handled)
+    assert.equal(1, recreate_calls,
+      "rotating to a different mode must rebuild the picker")
+  end)
+
+  it("onSetRotationMode is a no-op when rotation is unchanged", function()
+    local picker = ProfilePicker:new {
+      profiles = { { id = 1, name = "Bob" } },
+      on_select = noop,
+    }
+    local recreate_calls = 0
+    picker._recreate = function() recreate_calls = recreate_calls + 1 end
+
+    local handled = picker:onSetRotationMode(0) -- same as current
+    assert.is_false(handled)
+    assert.equal(0, recreate_calls)
+  end)
+
+  it("onScreenResize triggers a reshow", function()
+    -- ScreenResize fires when the framebuffer dimensions change for any
+    -- reason (rotation, window resize on desktop, etc.). The picker must
+    -- rebuild so its centered layout uses the new screen size.
+    local picker = ProfilePicker:new {
+      profiles = { { id = 1, name = "Bob" } },
+      on_select = noop,
+    }
+    local recreate_calls = 0
+    picker._recreate = function() recreate_calls = recreate_calls + 1 end
+
+    picker:onScreenResize({ w = 1200, h = 800 })
+    assert.equal(1, recreate_calls)
+  end)
+end)

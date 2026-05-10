@@ -165,6 +165,31 @@ function ProfilePicker:init()
   }
 end
 
+--- Re-layout the picker for the current screen dimensions. KOReader fires
+--- `onSetRotationMode` and `onScreenResize` on rotation; without these
+--- handlers we'd remain at the dimensions captured by `init` and look
+--- clipped or mis-aligned in the new orientation.
+function ProfilePicker:_reshow()
+  if self._reshow_in_progress then return end
+  self._reshow_in_progress = true
+  UIManager:close(self)
+  if self._recreate then self._recreate() end
+end
+
+function ProfilePicker:onSetRotationMode(new_rotation)
+  if new_rotation == nil or new_rotation == Screen:getRotationMode() then
+    return false
+  end
+  Screen:setRotationMode(new_rotation)
+  self:_reshow()
+  return true
+end
+
+function ProfilePicker:onScreenResize(_dimen)
+  self:_reshow()
+  return false
+end
+
 --- Convenience constructor + show. Returns the widget so callers can close
 --- it explicitly via `UIManager:close`.
 --- @param opts { profiles: UserProfile[], on_select: fun(p: UserProfile), on_manage: fun()|nil }
@@ -174,6 +199,9 @@ function ProfilePicker.show(opts)
     profiles = opts.profiles,
     on_select = opts.on_select,
     on_manage = opts.on_manage,
+    -- Stash a recreate closure so rotation/resize handlers can rebuild the
+    -- widget with the same callbacks against the new screen dimensions.
+    _recreate = function() return ProfilePicker.show(opts) end,
   }
   UIManager:show(picker)
   return picker
