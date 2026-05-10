@@ -1,15 +1,12 @@
 ---@diagnostic disable: undefined-global, undefined-field
 
--- Tests for the grid menu item layout.
---   * Cover and title share a centered VerticalGroup with a span between
---     them; the title TextWidget is constrained to the cover's horizontal
---     slot so long titles truncate cleanly instead of bleeding into
---     adjacent cells.
---   * The title TextWidget renders bold (post-redesign).
---   * When the entry has unread chapters, a corner badge is overlaid on the
---     cover's top-right via OverlapGroup + RightContainer. When there are
---     no unread chapters, no badge is rendered. Counts > 99 collapse to
---     "99+".
+-- Tests for the unified-card grid menu item layout.
+--
+-- Each cell is a single card: the cover fills the cell and a black title
+-- strip sits at the bottom of the cover with the manga title (white, bold)
+-- and the timestamp (white, smaller) overlaid on top of it. Unread chapters
+-- show as a coral-red badge in the cover's top-right corner. There is no
+-- separate metadata row beneath the cover anymore.
 
 local function stub_class(proto)
   local cls = proto or {}
@@ -34,9 +31,9 @@ local function stub_class(proto)
 end
 
 local screen_stub = {
-  getWidth    = function() return 600 end,
-  getHeight   = function() return 800 end,
-  scaleBySize = function(_, n) return n end,
+  getWidth      = function() return 600 end,
+  getHeight     = function() return 800 end,
+  scaleBySize   = function(_, n) return n end,
   getScreenMode = function() return "portrait" end,
 }
 
@@ -79,6 +76,13 @@ right_container_stub.new = function(self, opts)
   return inst
 end
 
+local bottom_container_stub = stub_class()
+bottom_container_stub.new = function(self, opts)
+  local inst = setmetatable(opts or {}, self)
+  inst._is_bottom_container = true
+  return inst
+end
+
 local frame_container_stub = stub_class()
 frame_container_stub.new = function(self, opts)
   local inst = setmetatable(opts or {}, self)
@@ -102,6 +106,9 @@ local menu_item_cover_stub = {
   end,
 }
 
+local BLACK_COLOR = { name = "black" }
+local WHITE_COLOR = { name = "white" }
+
 package.loaded["ui/gesturerange"]                    = stub_class()
 package.loaded["ui/widget/verticalgroup"]            = vertical_group_stub
 package.loaded["ui/widget/verticalspan"]             = vertical_span_stub
@@ -116,15 +123,16 @@ package.loaded["ui/font"]                            = { getFace = function(_, n
 package.loaded["ui/widget/container/framecontainer"] = frame_container_stub
 package.loaded["ffi/blitbuffer"]                     = {
   TRANSPARENT     = 0,
-  COLOR_WHITE     = 1,
-  COLOR_BLACK     = 2,
-  COLOR_DARK_GRAY = 3,
+  COLOR_WHITE     = WHITE_COLOR,
+  COLOR_BLACK     = BLACK_COLOR,
+  COLOR_DARK_GRAY = { name = "dark_gray" },
   ColorRGB24      = function(r, g, b) return { r = r, g = g, b = b, _is_rgb = true } end,
 }
 package.loaded["ui/widget/horizontalgroup"]          = stub_class()
 package.loaded["ui/widget/horizontalspan"]           = stub_class()
 package.loaded["ui/widget/overlapgroup"]             = overlap_group_stub
 package.loaded["ui/widget/container/rightcontainer"] = right_container_stub
+package.loaded["ui/widget/container/bottomcontainer"] = bottom_container_stub
 package.loaded["ui/geometry"]                        = {
   new = function(_, opts) return opts end,
 }
@@ -143,6 +151,7 @@ local function build_instance(overrides)
     infont_size = 14,
     bold      = false,
     dim       = false,
+    mandatory = "2 hours",
     entry     = { manga = { unread_chapters_count = 0 } },
   }
   if overrides then
@@ -171,80 +180,82 @@ local function walk(node, predicate, depth)
   return nil
 end
 
-describe("MenuItemGrid layout", function()
+describe("MenuItemGrid card layout", function()
   before_each(function()
     text_widget_calls = {}
   end)
 
-  it("constrains the title TextWidget to the cover's horizontal slot", function()
+  it("uses the full cell for the cover (drops the under-cover metadata row)", function()
     local inst = build_instance()
     inst:init()
 
-    local expected_img_width = inst.dimen.w - 6
-    local title_call = find_widget_call(function(opts) return opts.text == inst.text end)
+    -- The cover is generated with card_width = dimen.w - 6 and
+    -- card_height = dimen.h - 6 (CARD_INSET = 3 on each side). Previously
+    -- the cover's height also subtracted a 44px text row + extra padding.
+    assert.equal(inst.dimen.w - 6, generated_cover._w)
+    assert.equal(inst.dimen.h - 6, generated_cover._h)
+  end)
 
+  it("renders the title in white bold text inside the bottom title strip", function()
+    local inst = build_instance()
+    inst:init()
+
+    local title_call = find_widget_call(function(opts) return opts.text == inst.text end)
     assert.is_truthy(title_call, "expected title TextWidget to be constructed")
-    assert.equal(expected_img_width, title_call.max_width)
+    assert.is_true(title_call.bold == true, "title should be bold")
+    assert.equal(WHITE_COLOR, title_call.fgcolor)
+    -- Title is constrained so it ellipsizes inside the strip.
+    assert.is_true(title_call.max_width and title_call.max_width > 0)
   end)
 
-  it("renders the title bold so it pops against the cover frame", function()
+  it("renders the timestamp as white text on the title strip when mandatory is set", function()
+    local inst = build_instance({ mandatory = "just now" })
+    inst:init()
+
+    local ts_call = find_widget_call(function(opts) return opts.text == "just now" end)
+    assert.is_truthy(ts_call, "timestamp text widget should exist when mandatory is non-empty")
+    assert.equal(WHITE_COLOR, ts_call.fgcolor)
+  end)
+
+  it("omits the timestamp widget when mandatory is empty or nil", function()
+    local inst = build_instance({ mandatory = "" })
+    inst:init()
+
+    -- Only the title TextWidget should exist; nothing else with a non-empty text.
+    local extras = 0
+    for _, opts in ipairs(text_widget_calls) do
+      if opts.text ~= inst.text and type(opts.text) == "string" and opts.text ~= "" then
+        extras = extras + 1
+      end
+    end
+    assert.equal(0, extras, "no extra TextWidgets should be created when mandatory is empty")
+  end)
+
+  it("places the title strip at the bottom of the cover via BottomContainer", function()
     local inst = build_instance()
     inst:init()
 
-    local title_call = find_widget_call(function(opts) return opts.text == inst.text end)
-    assert.is_truthy(title_call)
-    assert.is_true(title_call.bold == true)
-  end)
+    local overlap = walk(inst[1], function(node) return node._is_overlap_group end)
+    assert.is_truthy(overlap, "card root should be an OverlapGroup")
 
-  it("places a VerticalSpan between the cover and the title in a centered group", function()
-    local inst = build_instance()
-    inst:init()
-
-    local cover_title_group = walk(inst[1], function(node)
-      if not node._is_vertical_group then return false end
-      local has_cover_idx, title_idx, span_between
-      for i, k in ipairs(node) do
-        if k == generated_cover then has_cover_idx = i end
-        -- Cover may be wrapped in an OverlapGroup once a badge is rendered.
-        if type(k) == "table" and k._is_overlap_group then has_cover_idx = i end
-        if type(k) == "table" and k.text == "A very long manga title that would otherwise overflow into the neighboring cell" then
-          title_idx = i
-        end
-      end
-      if has_cover_idx and title_idx and title_idx > has_cover_idx then
-        for i = has_cover_idx + 1, title_idx - 1 do
-          if node[i] and node[i]._is_vertical_span then
-            span_between = true
-            break
-          end
-        end
-        if span_between and node.align == "center" then return true end
-      end
-      return false
-    end)
-    assert.is_truthy(cover_title_group,
-      "expected a centered VerticalGroup containing cover, VerticalSpan, then title")
+    local bottom = walk(overlap, function(node) return node._is_bottom_container end)
+    assert.is_truthy(bottom, "title strip must be wrapped in BottomContainer to sit at the cover's bottom")
   end)
 
   it("renders no unread badge when the manga has zero unread chapters", function()
     local inst = build_instance()
     inst:init()
 
-    local badge_overlap = walk(inst[1], function(node) return node._is_overlap_group end)
-    assert.is_nil(badge_overlap,
-      "no OverlapGroup should be created when there are no unread chapters")
+    local right = walk(inst[1], function(node) return node._is_right_container end)
+    assert.is_nil(right, "no badge / RightContainer should be created when unread is 0")
   end)
 
-  it("renders an unread badge over the cover when unread > 0", function()
+  it("renders an unread badge in the cover's top-right when unread > 0", function()
     local inst = build_instance({ entry = { manga = { unread_chapters_count = 12 } } })
     inst:init()
 
-    local badge_overlap = walk(inst[1], function(node) return node._is_overlap_group end)
-    assert.is_truthy(badge_overlap, "expected an OverlapGroup wrapping the cover + badge")
-
-    local has_right_container = walk(badge_overlap, function(node) return node._is_right_container end)
-    assert.is_truthy(has_right_container,
-      "badge must be inside a RightContainer so it floats to the cover's right edge")
+    local right = walk(inst[1], function(node) return node._is_right_container end)
+    assert.is_truthy(right, "badge must be inside a RightContainer to float to the cover's right edge")
 
     local badge_text = find_widget_call(function(opts) return opts.text == "12" end)
     assert.is_truthy(badge_text, "badge text widget should display the unread count")
