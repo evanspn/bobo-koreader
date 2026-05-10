@@ -348,10 +348,9 @@ describe("MangaReader:show manga-switch job clearing", function()
   before_each(function()
     reset_manga_reader()
 
-    -- These tests now invoke the real MangaReader:show, which writes the
-    -- preferred orientation into the sidecar before KOReader opens the file.
-    -- Stub DocSettings.open as a recorder; the assertion target is
-    -- preload_jobs, not the sidecar.
+    -- These tests invoke the real MangaReader:show. Stub DocSettings.open
+    -- defensively so any future sidecar touch in show() doesn't blow up the
+    -- test; the assertion target is preload_jobs, not the sidecar.
     original_docsettings_open = package.loaded["docsettings"].open
     package.loaded["docsettings"].open = function(_, _path)
       return {
@@ -412,13 +411,13 @@ describe("MangaReader:show manga-switch job clearing", function()
   end)
 end)
 
--- ─── orientation sidecar writes (PR #22) ─────────────────────────────────────
+-- ─── orientation: KOReader owns rotation per chapter ─────────────────────────
 --
--- MangaReader writes the user's preferred portrait orientation
--- (`bobo_app_orientation`) directly into each chapter's `.sdr` sidecar before
--- KOReader opens the document, so KOReader picks up the right `rotation_mode`
--- from the start. See koreader-ui-guide.md for the colon/dot and `_G.` rules
--- the stubs below follow.
+-- Bobo no longer writes `rotation_mode` into chapter `.sdr` sidecars. Each
+-- chapter's rotation is stored and restored by KOReader's normal per-document
+-- persistence, so mid-chapter rotation survives a chapter advance. These tests
+-- pin that contract: regressing back to "Bobo overwrites rotation_mode" would
+-- break them.
 
 local function make_recording_docsettings()
   local saved = {}
@@ -433,7 +432,7 @@ local function make_recording_docsettings()
   return saved, original_open
 end
 
-describe("MangaReader:show orientation sidecar (first-open path)", function()
+describe("MangaReader:show does not write rotation_mode (first-open path)", function()
   local saved_calls
   local original_docsettings_open
 
@@ -461,33 +460,18 @@ describe("MangaReader:show orientation sidecar (first-open path)", function()
     package.loaded["apps/reader/readerui"].showReader = nil
   end)
 
-  local function show()
+  it("leaves rotation_mode untouched on first open", function()
     MangaReader:show({
       path                    = "/tmp/ch.cbz",
       on_return_callback      = function() end,
       on_end_of_book_callback = function() end,
     })
-  end
-
-  it("writes rotation_mode = 2 to the sidecar when orientation is left_hand", function()
-    show()
-    assert.equal(2, saved_calls.rotation_mode)
-  end)
-
-  it("writes rotation_mode = 0 when orientation is right_hand", function()
-    _G.G_reader_settings.readSetting = function() return "right_hand" end
-    show()
-    assert.equal(0, saved_calls.rotation_mode)
-  end)
-
-  it("falls back to rotation_mode = 0 when bobo_app_orientation is unset", function()
-    _G.G_reader_settings.readSetting = function() return nil end
-    show()
-    assert.equal(0, saved_calls.rotation_mode)
+    assert.is_nil(saved_calls.rotation_mode,
+      "Bobo must not write rotation_mode on first open — KOReader owns per-chapter rotation")
   end)
 end)
 
-describe("MangaReader:carryOverReaderSettings orientation sidecar", function()
+describe("MangaReader:carryOverReaderSettings does not write rotation_mode", function()
   local saved_calls
   local original_docsettings_open
 
@@ -513,27 +497,10 @@ describe("MangaReader:carryOverReaderSettings orientation sidecar", function()
     package.loaded["apps/reader/readerui"].instance = nil
   end)
 
-  it("writes rotation_mode = 2 to the new sidecar for left_hand", function()
+  it("does not overwrite the new chapter's rotation_mode on advance", function()
     MangaReader:carryOverReaderSettings("/tmp/new.cbz")
-    assert.equal(2, saved_calls.rotation_mode)
-  end)
-
-  it("writes rotation_mode = 0 to the new sidecar for right_hand", function()
-    _G.G_reader_settings.readSetting = function() return "right_hand" end
-    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
-    assert.equal(0, saved_calls.rotation_mode)
-  end)
-
-  it("does nothing when the new path equals the current document path", function()
-    package.loaded["apps/reader/readerui"].instance.document.file = "/tmp/new.cbz"
-    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
-    assert.is_nil(saved_calls.rotation_mode)
-  end)
-
-  it("does nothing when ReaderUI has no active instance", function()
-    package.loaded["apps/reader/readerui"].instance = nil
-    MangaReader:carryOverReaderSettings("/tmp/new.cbz")
-    assert.is_nil(saved_calls.rotation_mode)
+    assert.is_nil(saved_calls.rotation_mode,
+      "Chapter advance must not overwrite the new chapter's rotation — KOReader reads it from the sidecar")
   end)
 end)
 
