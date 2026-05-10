@@ -139,10 +139,36 @@ function LibraryView:_installActionBar()
   }
 end
 
---- KOReader's Menu:updateOfflineSubtitle re-runs BaseMenu.init when the
---- network state changes, which rebuilds self.page_info with the original
---- chevron row and silently wipes our action-bar swap. Re-install after
---- every re-init so the bar survives WiFi connect/disconnect.
+--- Re-install the action bar after the parent class rebuilds page_info.
+---
+--- Why this exists:
+---   widgets/Menu.lua's updateOfflineSubtitle calls BaseMenu.init(self)
+---   whenever the network state changes (it's called from
+---   onNetworkConnected / onNetworkDisconnected, plus once during the
+---   initial Menu:init with skip_reinit=true). BaseMenu.init constructs
+---   self.page_info from scratch as the original
+---   [<<, <, Page X of Y, >, >>] chevron HorizontalGroup. That silently
+---   wipes the VerticalGroup [ActionBar, gap, page_info_text] that
+---   _installActionBar swapped in during LibraryView:init.
+---
+---   Concretely: if WiFi finishes connecting AFTER the Library view is
+---   shown (very common — the connect event lands a few hundred ms
+---   later), onNetworkConnected fires, which calls
+---   updateOfflineSubtitle(false), which calls BaseMenu.init, which
+---   replaces self.page_info — and the user sees the chevron pagination
+---   row instead of the action bar.
+---
+--- The fix:
+---   Override updateOfflineSubtitle so that any time the parent
+---   re-runs BaseMenu.init we immediately re-run _installActionBar to
+---   put our row back. Two guards:
+---     - skip_reinit=true: the parent skipped BaseMenu.init, so
+---       page_info wasn't rebuilt and there's nothing to re-do. The
+---       initial Menu:init() call always uses skip_reinit=true; the
+---       later network-event calls always use skip_reinit=false.
+---     - page_info_text == nil: BaseMenu.init hasn't completed even
+---       once yet, so there's no page_info_text to wrap. Bail out
+---       and let the explicit _installActionBar in init() handle it.
 function LibraryView:updateOfflineSubtitle(skip_reinit)
   Menu.updateOfflineSubtitle(self, skip_reinit)
   if not skip_reinit and self.page_info_text then
