@@ -215,7 +215,7 @@ function MangaReader:onPageUpdate(new_page)
   if self.preload_on_progress and not self._progress_preload_triggered then
     local total_pages = ReaderUI.instance
       and ReaderUI.instance.document
-      and ReaderUI.instance.document:getNbPages()
+      and ReaderUI.instance.document:getPageCount()
     if total_pages and total_pages > 0 and new_page / total_pages >= 0.8 then
       self._progress_preload_triggered = true
       -- Preload at least 1 chapter regardless of preload_count setting.

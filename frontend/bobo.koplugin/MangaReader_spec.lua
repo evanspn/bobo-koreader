@@ -228,7 +228,7 @@ describe("MangaReader:onPageUpdate progress preload", function()
 
     -- Fake a ReaderUI with a known page count.
     package.loaded["apps/reader/readerui"].instance = {
-      document = { getNbPages = function() return 10 end },
+      document = { getPageCount = function() return 10 end },
       rolling  = nil,
     }
   end)
@@ -268,6 +268,27 @@ describe("MangaReader:onPageUpdate progress preload", function()
     -- With count=0 and the math.max fix, should still preload at least 1 chapter.
     assert.is_not_nil(MangaReader.preload_jobs["ch2"], "job should fire even when preload_count=0")
   end)
+
+  -- Regression: production code must call `getPageCount` (Document base
+  -- method, present on every subclass including the picviewer engine that
+  -- handles CBZ) instead of `getNbPages` (MuPDF-only). A v1.3.x build
+  -- crashed on real devices with `attempt to call method 'getNbPages'
+  -- (a nil value)` when a CBZ chapter advanced past 80%.
+  it("uses getPageCount (not getNbPages) so CBZ documents don't crash", function()
+    package.loaded["apps/reader/readerui"].instance = {
+      document = {
+        getPageCount = function() return 10 end,
+        -- Deliberately no getNbPages — mirrors what KOReader's picviewer
+        -- engine exposes for CBZ files. If the production code regresses
+        -- back to :getNbPages(), this test crashes on the colon-call.
+      },
+      rolling = nil,
+    }
+
+    assert.has_no.errors(function() MangaReader:onPageUpdate(8) end)
+    assert.is_not_nil(MangaReader.preload_jobs["ch2"],
+      "preload should still trigger on a document that only exposes getPageCount")
+  end)
 end)
 
 -- ─── successful job stays usable after pruning ────────────────────────────────
@@ -280,7 +301,7 @@ describe("preload job lifecycle: prune then reuse", function()
       return { type = "SUCCESS", body = chapter_id .. "-job" }
     end
     package.loaded["apps/reader/readerui"].instance = {
-      document = { getNbPages = function() return 10 end },
+      document = { getPageCount = function() return 10 end },
       rolling  = nil,
     }
   end)
@@ -540,7 +561,7 @@ describe("MangaReader:onPageUpdate poll throttle", function()
     }
 
     package.loaded["apps/reader/readerui"].instance = {
-      document = { getNbPages = function() return 100 end },
+      document = { getPageCount = function() return 100 end },
       rolling  = nil,
     }
   end)
