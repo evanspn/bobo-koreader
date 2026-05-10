@@ -100,19 +100,24 @@ Redesign:
 
 The collapse is the highest-leverage change for "looks less busy" without losing functionality.
 
-### 3. Footer pagination
+### 3. Footer + persistent action bar
 
-Today: `«   ‹   Page 1 of 3   ›   »` — five tap targets in a row.
+The Libra Colour has hardware page-turn buttons, so on-screen pagination chevrons are dead weight. Modal flows are also slow on e-ink (every menu open/close is a refresh), so common actions need to live on the screen, not in the overflow menu.
 
-Redesign:
+The redesign replaces KOReader's pagination chevron row entirely with:
 
 ```
-        ‹       1 / 3       ›
+┌──────────────────────────────────────┐
+│  🔍       ⛛       ▦      ↻           │
+│ Search   Sort    View   Refresh      │
+│           Page 1 of 3                │
+└──────────────────────────────────────┘
 ```
 
-- Drop `«` / `»` (jump-to-end). Hold-tap on `‹`/`›` can do the same — document it.
-- Center the indicator; bump `‹` and `›` to 1.5× the current icon size for thumbable targets.
-- On the only-one-page case, hide the footer entirely (today it shows greyed-out arrows).
+- **Action bar.** A new `widgets/ActionBar.lua` renders four evenly-spaced `Search · Sort · View · Refresh` cells (Font Awesome glyph + small label) across the full width. Each cell is an `InputContainer` with a `Tap` `GestureRange` covering the whole cell area, not just the glyph. Glyphs come from `Icons.lua` (no dependency on the koreader icon-SVG set).
+- **View toggles view mode.** Cycles `grid → cover → base → grid` via `Backend.setSettings(library_view_mode)` + `updateItems`.
+- **Page label.** Keeps the existing `self.page_info_text` Button so KOReader's `BaseMenu:updatePageInfo` continues to update the count on page change. The chevron Buttons (`page_info_left_chev` etc.) still exist on `self` so `setEnabled` calls don't error — they're just not in the new `self.page_info` layout, so they don't render.
+- **Search moves out of the title bar.** The right side becomes just `bell + close`, since Search is now in the action bar (no duplication).
 
 ### 4. Empty state
 

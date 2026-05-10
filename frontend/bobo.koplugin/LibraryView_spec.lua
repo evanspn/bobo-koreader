@@ -147,6 +147,7 @@ package.loaded["patch/MenuCustom"]            = stub_class({ init = noop, update
 package.loaded["patch/MenuItemCover"]         = stub_class()
 package.loaded["patch/MenuItemGrid"]          = stub_class()
 package.loaded["PlaylistDialog"]              = { fetchAndShow = noop }
+package.loaded["widgets/ActionBar"]           = stub_class()
 
 package.loaded["LibraryView"] = nil
 local LibraryView = require("LibraryView")
@@ -244,6 +245,29 @@ describe("LibraryView cover-tap / context-menu wiring", function()
 
     sort_btn.callback()
     assert.equal(1, sort_calls)
+  end)
+
+  it("_cycleViewMode advances through grid -> cover -> base -> grid and persists the choice", function()
+    local view = make_view()
+    local persisted = {}
+    -- Capture what gets sent to the backend so we can assert the cycle order.
+    package.loaded["Backend"].getSettings = function()
+      return { type = "SUCCESS", body = { library_view_mode = view.library_view_mode or "cover" } }
+    end
+    package.loaded["Backend"].setSettings = function(s)
+      table.insert(persisted, s.library_view_mode)
+      return { type = "SUCCESS" }
+    end
+    view.fetchMangas = function() return {} end
+    view.updateItems = function() end
+
+    view.library_view_mode = "grid"
+    view:_cycleViewMode()
+    view:_cycleViewMode()
+    view:_cycleViewMode()
+
+    assert.same({ "cover", "base", "grid" }, persisted)
+    assert.equal("grid", view.library_view_mode)
   end)
 
   it("openMenu offers a Playlists entry (collapsed from the title bar)", function()
