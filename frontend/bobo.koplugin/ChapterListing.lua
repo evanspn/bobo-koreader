@@ -604,7 +604,14 @@ function ChapterListing:markChapterAs(chapter, value)
       return
     end
 
-    self:findRootChapter(chapter).read = value
+    local root = self:findRootChapter(chapter)
+    root.read = value
+    -- The backend clears `last_read` when a chapter is unmarked. Mirror that
+    -- locally so Resume doesn't pick this chapter on the next tap, before any
+    -- refresh has run.
+    if not value then
+      root.last_read = nil
+    end
     self:updateItems()
   end)
 end
