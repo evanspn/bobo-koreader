@@ -128,15 +128,26 @@ function LibraryView:_installActionBar()
     },
   }
 
-  -- Keep self.page_info_text so KOReader's BaseMenu:updatePageInfo can still
-  -- update the page text on page change. Replace self.page_info itself with
-  -- a stack of [action bar, small gap, page label] — the chevrons are gone.
-  self.page_info = VerticalGroup:new {
+  -- Mutate self.page_info IN PLACE rather than reassigning. KOReader's
+  -- BaseMenu builds its content widget tree referencing the original
+  -- self.page_info widget object directly; a plain `self.page_info = X`
+  -- doesn't propagate to that tree, so the chevron row keeps painting.
+  -- Wipe the HorizontalGroup's existing children, then push a single
+  -- VerticalGroup that stacks [action_bar, gap, page_info_text]. Keep
+  -- self.page_info_text intact so BaseMenu:updatePageInfo can still
+  -- update the page label on page change.
+  local page_info = self.page_info
+  if not page_info or not self.page_info_text then return end
+  for i = #page_info, 1, -1 do
+    page_info[i] = nil
+  end
+  page_info:resetLayout()
+  table.insert(page_info, VerticalGroup:new {
     align = "center",
     action_bar,
     VerticalSpan:new { width = Screen:scaleBySize(2) },
     self.page_info_text,
-  }
+  })
 end
 
 --- Re-install the action bar after the parent class rebuilds page_info.
