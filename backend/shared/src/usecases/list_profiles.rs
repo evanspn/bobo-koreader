@@ -5,6 +5,7 @@ pub fn list_profiles(settings: &Settings) -> Vec<UserProfile> {
         vec![UserProfile {
             id: 1,
             name: "Default".to_string(),
+            color: None,
         }]
     } else {
         settings.profiles.clone()

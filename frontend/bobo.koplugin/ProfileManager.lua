@@ -7,6 +7,7 @@ local Font = require("ui/font")
 local Geom = require("ui/geometry")
 local GestureRange = require("ui/gesturerange")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
+local HorizontalSpan = require("ui/widget/horizontalspan")
 local InputDialog = require("ui/widget/inputdialog")
 local LeftContainer = require("ui/widget/container/leftcontainer")
 local MenuItem = require("MenuItem")
@@ -20,9 +21,12 @@ local UIManager = require("ui/uimanager")
 local UnderlineContainer = require("ui/widget/container/underlinecontainer")
 local _ = require("gettext+")
 
+local Avatar = require("Avatar")
 local Backend = require("Backend")
 local ErrorDialog = require("ErrorDialog")
 local Icons = require("Icons")
+
+local AVATAR_ROW_SIZE_DP = 40
 
 --- A single profile row: tap to switch, hold/ellipsis for context menu.
 local ProfileItem = MenuItem:extend {
@@ -57,6 +61,10 @@ function ProfileItem:init()
     label = Icons.FA_CHECK .. "  " .. label
   end
 
+  local avatar_size = Screen:scaleBySize(AVATAR_ROW_SIZE_DP)
+  local avatar_gap  = Screen:scaleBySize(8)
+  local label_max_w = content_width - avatar_size - avatar_gap - button_w - button_p * 2
+
   self._underline_container = UnderlineContainer:new {
     color = self.line_color,
     linesize = self.linesize,
@@ -69,10 +77,19 @@ function ProfileItem:init()
         dimen = Geom:new { w = content_width, h = self.dimen.h },
         LeftContainer:new {
           dimen = Geom:new { w = content_width, h = self.dimen.h },
-          TextWidget:new {
-            text = label,
-            face = face,
-            max_width = content_width - button_w - button_p * 2,
+          HorizontalGroup:new {
+            align = "center",
+            Avatar:new {
+              size = avatar_size,
+              name = profile.name,
+              color = profile.color,
+            },
+            HorizontalSpan:new { width = avatar_gap },
+            TextWidget:new {
+              text = label,
+              face = face,
+              max_width = label_max_w,
+            },
           },
         },
         RightContainer:new {
@@ -136,7 +153,8 @@ local function openCreateDialog(on_done)
               on_done()
               return
             end
-            local r = Backend.createProfile(name)
+            local color = Avatar.colorFromName(name)
+            local r = Backend.createProfile(name, color)
             if r.type == 'ERROR' then
               ErrorDialog:show(r.message)
               return
@@ -150,6 +168,85 @@ local function openCreateDialog(on_done)
   }
   UIManager:show(dialog)
   dialog:onShowKeyboard()
+end
+
+--- Opens a dialog to rename an existing profile (default profile included).
+local function openRenameDialog(profile, on_done)
+  local dialog
+  dialog = InputDialog:new {
+    title = _("Rename Profile"),
+    input = profile.name,
+    input_hint = _("Profile name"),
+    buttons = {
+      {
+        {
+          text = _("Cancel"),
+          id = "close",
+          callback = function()
+            UIManager:close(dialog)
+            on_done()
+          end,
+        },
+        {
+          text = _("Save"),
+          is_enter_default = true,
+          callback = function()
+            local name = dialog:getInputText()
+            UIManager:close(dialog)
+            if not name or name:match("^%s*$") then
+              on_done()
+              return
+            end
+            local r = Backend.updateProfile(profile.id, name, nil)
+            if r.type == 'ERROR' then
+              ErrorDialog:show(r.message)
+              return
+            end
+            on_done()
+          end,
+        },
+      },
+    },
+    close_callback = function() on_done() end,
+  }
+  UIManager:show(dialog)
+  dialog:onShowKeyboard()
+end
+
+--- Opens a button-grid color picker. Each button is labeled with the color
+--- name and applies it to the profile when tapped.
+local function openColorPicker(profile, on_done)
+  local dialog
+  local buttons = {}
+  -- 2 colors per row keeps button labels readable on small Kobo screens.
+  local row = {}
+  for _i, color_id in ipairs(Avatar.availableColors()) do
+    local active_marker = (profile.color == color_id) and (Icons.FA_CHECK .. "  ") or ""
+    table.insert(row, {
+      text = active_marker .. color_id:sub(1, 1):upper() .. color_id:sub(2),
+      callback = function()
+        UIManager:close(dialog)
+        local r = Backend.updateProfile(profile.id, nil, color_id)
+        if r.type == 'ERROR' then
+          ErrorDialog:show(r.message)
+          return
+        end
+        on_done()
+      end,
+    })
+    if #row == 2 then
+      table.insert(buttons, row)
+      row = {}
+    end
+  end
+  if #row > 0 then table.insert(buttons, row) end
+
+  dialog = ButtonDialog:new {
+    title = _("Choose color"),
+    buttons = buttons,
+    tap_close_callback = on_done,
+  }
+  UIManager:show(dialog)
 end
 
 --- Shows the profile management dialog.
@@ -208,6 +305,24 @@ function ProfileManager:_buildAndShow(profiles, on_return_callback)
             callback = function()
               UIManager:close(ctx)
               on_switch(profile)
+            end,
+          },
+        },
+        {
+          {
+            text = Icons.FA_PEN .. "  " .. _("Rename"),
+            callback = function()
+              UIManager:close(ctx)
+              openRenameDialog(profile, refresh)
+            end,
+          },
+        },
+        {
+          {
+            text = Icons.FA_PALETTE .. "  " .. _("Change color"),
+            callback = function()
+              UIManager:close(ctx)
+              openColorPicker(profile, refresh)
             end,
           },
         },

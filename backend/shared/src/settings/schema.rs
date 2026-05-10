@@ -71,6 +71,10 @@ pub enum SearchViewMode {
 pub struct UserProfile {
     pub id: i64,
     pub name: String,
+    /// Color identifier for the profile avatar (e.g. "red", "blue"). When `None`
+    /// the frontend picks a deterministic default from the profile name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }
 
 /// Settings used to configure bobo's behavior.
