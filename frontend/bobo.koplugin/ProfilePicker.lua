@@ -120,6 +120,14 @@ function ProfilePicker:init()
     local cell = ProfilePickerCell:new {
       profile = profile,
       on_tap = function()
+        -- Close self before invoking the caller's on_select. The caller
+        -- holds a reference to whichever ProfilePicker.show returned,
+        -- but if rotation/resize ran _reshow, a fresh picker was spawned
+        -- and the caller's reference points to the already-closed
+        -- original. Self-closing here means whichever picker is currently
+        -- on screen always cleans itself up, regardless of who has
+        -- which reference.
+        UIManager:close(self)
         if self.on_select then self.on_select(profile) end
       end,
     }
@@ -141,6 +149,10 @@ function ProfilePicker:init()
     bordersize = 0,
     padding = Size.padding.button,
     callback = function()
+      -- Same reason as on_tap above: self-close so a rotation-spawned
+      -- picker doesn't get orphaned when the caller's stale reference
+      -- closes the wrong instance.
+      UIManager:close(self)
       if self.on_manage then self.on_manage() end
     end,
   }
