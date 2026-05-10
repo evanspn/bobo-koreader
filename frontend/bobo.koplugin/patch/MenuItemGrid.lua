@@ -31,8 +31,15 @@ local CARD_INSET = 3
 -- Padding around the text band. The band's actual height is computed from
 -- the title/timestamp TextWidget sizes — a fixed reserve was overflowing on
 -- some font configurations and bleeding into the next row.
+--
+-- BOTTOM_SLACK is extra room beneath the timestamp's baseline: TextWidget's
+-- getSize().h covers the font's logical metrics but the actual rendered
+-- glyph (especially with descenders like "g" / "y" / "p" in "hours" or
+-- "days") can extend a couple of px lower. Without slack, those tails get
+-- clipped by the next row of covers / by the action bar.
 local TEXT_BAND_TOP_PAD     = 4
 local TEXT_BAND_BOTTOM_PAD  = 2
+local TEXT_BAND_BOTTOM_SLACK = 4
 local TEXT_BAND_INNER_GAP   = 2
 
 local MenuItemGrid = MenuItemRaw:extend {}
@@ -93,14 +100,15 @@ function MenuItemGrid:init()
     }
   end
 
-  local top_pad     = Screen:scaleBySize(TEXT_BAND_TOP_PAD)
-  local bottom_pad  = Screen:scaleBySize(TEXT_BAND_BOTTOM_PAD)
-  local inner_gap   = Screen:scaleBySize(TEXT_BAND_INNER_GAP)
-  local title_h     = title_widget:getSize().h
-  local timestamp_h = timestamp_widget and timestamp_widget:getSize().h or 0
-  local text_band_h = top_pad + title_h
+  local top_pad      = Screen:scaleBySize(TEXT_BAND_TOP_PAD)
+  local bottom_pad   = Screen:scaleBySize(TEXT_BAND_BOTTOM_PAD)
+  local bottom_slack = Screen:scaleBySize(TEXT_BAND_BOTTOM_SLACK)
+  local inner_gap    = Screen:scaleBySize(TEXT_BAND_INNER_GAP)
+  local title_h      = title_widget:getSize().h
+  local timestamp_h  = timestamp_widget and timestamp_widget:getSize().h or 0
+  local text_band_h  = top_pad + title_h
     + (timestamp_widget and (inner_gap + timestamp_h) or 0)
-    + bottom_pad
+    + bottom_pad + bottom_slack
 
   local cover_height = card_height - text_band_h
   local cover_widget = MenuItemCover.genCover(self, card_width, cover_height)
@@ -171,7 +179,7 @@ function MenuItemGrid:init()
     padding_left = title_pad_x,
     padding_right = title_pad_x,
     padding_top = top_pad,
-    padding_bottom = bottom_pad,
+    padding_bottom = bottom_pad + bottom_slack,
     text_stack,
   }
 

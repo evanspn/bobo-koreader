@@ -134,8 +134,11 @@ local MenuItemGrid = require("patch/MenuItemGrid")
 -- timestamp TextWidget sizes (Screen:scaleBySize is identity in the
 -- stub, so the math is just integer addition). With the stub's
 -- getSize returning h = 16 for every TextWidget:
---   top_pad(4) + title(16) + gap(2) + timestamp(16) + bottom_pad(2) = 40
-local TEXT_BAND_H = 4 + 16 + 2 + 16 + 2
+--   top_pad(4) + title(16) + gap(2) + timestamp(16) + bottom_pad(2)
+--   + bottom_slack(4) = 44
+-- bottom_slack accounts for descender glyph tails ("g", "y", "p" in
+-- "hours" / "days") that paint slightly below getSize().h.
+local TEXT_BAND_H = 4 + 16 + 2 + 16 + 2 + 4
 
 local function build_instance(overrides)
   local inst = {
@@ -196,9 +199,9 @@ describe("MenuItemGrid card layout", function()
     local inst = build_instance({ mandatory = "" })
     inst:init()
 
-    -- top_pad(4) + title(16) + bottom_pad(2) = 22 — no inner gap, no
-    -- timestamp height. Cover gets the freed pixels back.
-    local expected_band_h = 4 + 16 + 2
+    -- top_pad(4) + title(16) + bottom_pad(2) + bottom_slack(4) = 26 — no
+    -- inner gap, no timestamp height. Cover gets the freed pixels back.
+    local expected_band_h = 4 + 16 + 2 + 4
     assert.equal(inst.dimen.h - 6 - expected_band_h, generated_cover._h)
   end)
 
