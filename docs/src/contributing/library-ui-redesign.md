@@ -1,10 +1,10 @@
 # Library UI Redesign
 
-Design plan for the Library grid view (`LibraryView.lua` + `patch/MenuItemGrid.lua`) targeting **Kobo Libra Colour** (E Ink Kaleido 3) and other color e-ink devices, while degrading gracefully on greyscale Kobos.
+Design plan for the Library grid view (`LibraryView.lua` + `patch/MenuItemGrid.lua`). **Target device: Kobo Libra Colour (E Ink Kaleido 3).** Greyscale Kobos are explicitly out of scope for this redesign — color is used as a primary signal, not an enhancement.
 
 ## Why we're redoing it
 
-The current grid (see screenshot in PR #—) renders flat: covers float on the page with no frame, the title bar packs six icons across one row with no breathing room, and the unread count is a small text glyph buried under the cover. There is no visual signal for "currently reading", "new chapters", or read progress — every cell looks identical.
+The current grid renders flat: covers float on the page with no frame, the title bar packs six icons across one row with no breathing room, and the unread count is a small text glyph buried under the cover. There is no visual signal for "currently reading", "new chapters", or read progress — every cell looks identical.
 
 ## Hardware constraints (Kaleido 3)
 
@@ -16,7 +16,6 @@ The Libra Colour layers a color filter array (CFA) on top of a 300 ppi greyscale
 | Total colors | 4096 | Plenty for our needs, but only ~16 are reliably distinguishable |
 | Saturation | Muted vs LCD due to CFA | Prefer saturated primaries (red/blue/orange/green); pastels wash out |
 | Refresh | Slow, ghosting on partial refresh | No animations, minimize per-cell widget count |
-| Greyscale fallback | Older Kobos have no color | Color must be additive — never the only signal for state |
 
 **Rule of thumb:** black + white + greys carry structure and text; color is reserved for **state** (unread, in-progress, currently reading).
 
@@ -28,15 +27,15 @@ Use KOReader's `Blitbuffer` color constants where possible; introduce a small ac
 
 | Token | Value | Use |
 |---|---|---|
-| `bobo.ink` | `COLOR_BLACK` | Primary text, frames, progress bar fill |
+| `bobo.ink` | `COLOR_BLACK` | Primary text, cover frames, progress bar fill |
 | `bobo.ink_dim` | `COLOR_DARK_GRAY` | Secondary text (timestamps, source name) |
-| `bobo.rule` | `COLOR_LIGHT_GRAY` | Cover frame, dividers, progress track |
+| `bobo.rule` | `COLOR_LIGHT_GRAY` | Dividers, progress track |
 | `bobo.page` | `COLOR_WHITE` | Background |
-| `bobo.accent` | `Color8(0xE8, 0x4A, 0x3D)` (coral red) | Unread badge fill, "new" indicators |
-| `bobo.accent_alt` | `Color8(0x2E, 0x6B, 0xC9)` (deep blue) | "Currently reading" border / continue-reading button |
-| `bobo.accent_warn` | `Color8(0xD9, 0x7B, 0x1F)` (warm orange) | Optional: stale (>30d) library items |
+| `bobo.accent` | `ColorRGB24(0xC0, 0x39, 0x2B)` (deep red) | Unread badge fill |
+| `bobo.accent_alt` | `ColorRGB24(0x1F, 0x6F, 0xB9)` (deep blue) | "Currently reading" border |
+| `bobo.accent_warn` | `ColorRGB24(0xE6, 0x82, 0x2E)` (warm orange) | Optional: stale (>30d) library items |
 
-Accent values picked for Kaleido 3: full saturation, mid-luminance so they read against both the warm-light page and an unlit cool page.
+Accents reuse the existing `Avatar.lua` palette so the color identity stays consistent across the app. Values picked for Kaleido 3: full saturation, mid-luminance so they read against both the warm-light page and an unlit cool page.
 
 ### Spacing
 
@@ -156,17 +155,6 @@ busted --lua luajit -C frontend/bobo.koplugin .
 ```
 
 before pushing.
-
-## Greyscale degradation
-
-Every accent-colored element must be legible without color. Verification list:
-
-- Unread badge: black-filled rectangle with white text on greyscale — still reads as a badge.
-- Currently-reading border: 2px black border (vs 1px grey) — still distinguishable.
-- Progress bar: black on light grey — unchanged.
-- Empty-state icon: render in `ink` on greyscale.
-
-Detect color capability via `Screen:isColorEnabled()` (KOReader exposes this on `device.screen`); fall back to `bobo.ink` for accents when false.
 
 ## Open questions
 

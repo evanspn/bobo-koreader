@@ -222,4 +222,50 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.equal(manga, chapter_listing_calls[1].manga)
     assert.equal(true, chapter_listing_calls[1].fullscreen)
   end)
+
+  it("openMenu offers a Sort by... entry that opens the sort dialog", function()
+    local view = make_view()
+    local sort_calls = 0
+    view.openSortDialog = function() sort_calls = sort_calls + 1 end
+
+    view:openMenu()
+
+    assert.is_not_nil(last_button_dialog, "openMenu must open a ButtonDialog")
+
+    local sort_btn
+    for _, row in ipairs(last_button_dialog.buttons) do
+      for _, btn in ipairs(row) do
+        if type(btn.text) == "string" and btn.text:find("Sort by...", 1, true) then
+          sort_btn = btn
+        end
+      end
+    end
+    assert.is_not_nil(sort_btn, "openMenu must include a Sort by... entry")
+
+    sort_btn.callback()
+    assert.equal(1, sort_calls)
+  end)
+
+  it("openMenu offers a Playlists entry (collapsed from the title bar)", function()
+    local view = make_view()
+    local playlist_calls = 0
+    view.openPlaylistDialog = function() playlist_calls = playlist_calls + 1 end
+
+    view:openMenu()
+    assert.is_not_nil(last_button_dialog)
+
+    local playlists_btn
+    for _, row in ipairs(last_button_dialog.buttons) do
+      for _, btn in ipairs(row) do
+        if type(btn.text) == "string" and btn.text:find("Playlists", 1, true) then
+          playlists_btn = btn
+        end
+      end
+    end
+    assert.is_not_nil(playlists_btn,
+      "openMenu must include a Playlists entry now that the title bar icon is gone")
+
+    playlists_btn.callback()
+    assert.equal(1, playlist_calls)
+  end)
 end)

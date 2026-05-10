@@ -146,95 +146,19 @@ function LibraryView:patchTitleBar(count_notify)
   local right_icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * right_icon_size_ratio)
   local button_padding = Screen:scaleBySize(11)
 
-  self.title_bar.left_button = HorizontalGroup:new {
-    IconButton:new {
-      icon = "appbar.settings",
-      icon_rotation_angle = self.left_icon_rotation_angle,
-      width = left_icon_size,
-      height = left_icon_size,
-      padding = button_padding,
-      padding_bottom = left_icon_size,
-      callback = self.title_bar.left_icon_tap_callback,
-      hold_callback = self.title_bar.left_icon_hold_callback,
-      allow_flash = self.title_bar.left_icon_allow_flash,
-      show_parent = self.title_bar.show_parent,
-    },
-    IconButton:new {
-      icon = "column.two",
-      width = left_icon_size,
-      height = left_icon_size,
-      padding = button_padding,
-      padding_bottom = right_icon_size,
-      callback = function()
-        self:openPlaylistDialog()
-      end,
-      allow_flash = self.title_bar.left_icon_allow_flash,
-      show_parent = self.title_bar.show_parent,
-    },
-    IconButton:new {
-      icon = "align.center",
-      width = left_icon_size,
-      height = left_icon_size,
-      padding = button_padding,
-      padding_bottom = right_icon_size,
-      padding_right = 2 * left_icon_size,
-      callback = function()
-        Trapper:wrap(function()
-          local response = Backend.getSettings()
-          if response.type == 'ERROR' then
-            ErrorDialog:show(response.message)
-          end
-
-          local settings = response.body
-
-          local key = "library_sorting_mode"
-          local tuple = findEntries(Settings.setting_value_definitions, key)
-
-          local radio_buttons = {}
-          for _, option in ipairs(tuple.options) do
-            table.insert(radio_buttons, {
-              {
-                text = option.label,
-                provider = option.value,
-                checked = settings[key] == option.value,
-              },
-            })
-          end
-
-          local dialog
-          dialog = RadioButtonWidget:new {
-            title_text = tuple.title,
-            radio_buttons = radio_buttons,
-            callback = function(radio)
-              UIManager:close(dialog)
-
-              settings[key] = radio.provider
-
-              local response = Backend.setSettings(settings)
-              if response.type == 'ERROR' then
-                ErrorDialog:show(response.message)
-                return
-              end
-
-              local mangas = self:fetchMangas()
-              if not mangas then
-                return
-              end
-
-              self.mangas_raw = mangas
-              self.favorite_search_keyword = nil
-              self.mangas = mangas
-
-              self:updateItems()
-
-              UIManager:show(dialog)
-            end
-          }
-
-          UIManager:show(dialog)
-        end)
-      end
-    },
+  -- Single overflow icon on the left. Playlists and sort live inside the
+  -- menu now (see openMenu), which keeps the title bar from feeling crowded.
+  self.title_bar.left_button = IconButton:new {
+    icon = "appbar.menu",
+    icon_rotation_angle = self.left_icon_rotation_angle,
+    width = left_icon_size,
+    height = left_icon_size,
+    padding = button_padding,
+    padding_bottom = left_icon_size,
+    callback = self.title_bar.left_icon_tap_callback,
+    hold_callback = self.title_bar.left_icon_hold_callback,
+    allow_flash = self.title_bar.left_icon_allow_flash,
+    show_parent = self.title_bar.show_parent,
   }
 
   self.title_bar.right_button = HorizontalGroup:new {
@@ -340,6 +264,9 @@ function LibraryView:generateItemTableFromMangas(mangas)
   local item_table = {}
   local is_cover = self:getLibraryViewMode() == "cover"
 
+  local mode = self:getLibraryViewMode()
+  local is_grid = mode == "grid"
+
   for _, manga in ipairs(mangas) do
     local mandatory = ""
 
@@ -350,9 +277,11 @@ function LibraryView:generateItemTableFromMangas(mangas)
     local space = is_cover and "  " .. Icons.DOT .. "  " or ""
 
     mandatory = mandatory .. (manga.last_read and space
-      .. calcLastReadText(manga.last_read, self:getLibraryViewMode() ~= "base") .. (is_cover and "" or " ") or "")
+      .. calcLastReadText(manga.last_read, mode ~= "base") .. (is_cover and "" or " ") or "")
 
-    if manga.unread_chapters_count ~= nil and manga.unread_chapters_count > 0 then
+    -- In grid mode the unread count is rendered as a corner badge over the
+    -- cover, so don't duplicate it in the metadata line.
+    if not is_grid and manga.unread_chapters_count ~= nil and manga.unread_chapters_count > 0 then
       if is_cover then
         mandatory = mandatory .. space .. Icons.FA_BELL .. " " .. manga.unread_chapters_count
       else
@@ -363,9 +292,9 @@ function LibraryView:generateItemTableFromMangas(mangas)
     table.insert(item_table, {
       manga = manga,
       text = manga.title,
-      post_text = self:getLibraryViewMode() == "cover" and mandatory or manga.source.name,
+      post_text = mode == "cover" and mandatory or manga.source.name,
       manga_cover = manga.manga_cover,
-      mandatory = self:getLibraryViewMode() ~= "cover" and mandatory or nil,
+      mandatory = mode ~= "cover" and mandatory or nil,
     })
   end
 
@@ -715,6 +644,65 @@ function LibraryView:_handleRemoveFromPlaylist(manga)
 end
 
 --- @private
+function LibraryView:openSortDialog()
+  Trapper:wrap(function()
+    local response = Backend.getSettings()
+    if response.type == 'ERROR' then
+      ErrorDialog:show(response.message)
+      return
+    end
+
+    local settings = response.body
+
+    local key = "library_sorting_mode"
+    local tuple = findEntries(Settings.setting_value_definitions, key)
+
+    local radio_buttons = {}
+    for _, option in ipairs(tuple.options) do
+      table.insert(radio_buttons, {
+        {
+          text = option.label,
+          provider = option.value,
+          checked = settings[key] == option.value,
+        },
+      })
+    end
+
+    local dialog
+    dialog = RadioButtonWidget:new {
+      title_text = tuple.title,
+      radio_buttons = radio_buttons,
+      callback = function(radio)
+        UIManager:close(dialog)
+
+        settings[key] = radio.provider
+
+        local set_response = Backend.setSettings(settings)
+        if set_response.type == 'ERROR' then
+          ErrorDialog:show(set_response.message)
+          return
+        end
+
+        local mangas = self:fetchMangas()
+        if not mangas then
+          return
+        end
+
+        self.mangas_raw = mangas
+        self.favorite_search_keyword = nil
+        self.mangas = mangas
+
+        self:updateItems()
+
+        UIManager:show(dialog)
+      end
+    }
+
+    UIManager:show(dialog)
+  end)
+end
+
+--- @private
 function LibraryView:openMenu()
   local dialog
 
@@ -745,6 +733,13 @@ function LibraryView:openMenu()
         callback = function()
           UIManager:close(dialog)
           self:openPlaylistDialog()
+        end
+      },
+      {
+        text = Icons.FA_FILTER .. " " .. _("Sort by..."),
+        callback = function()
+          UIManager:close(dialog)
+          self:openSortDialog()
         end
       },
     },
