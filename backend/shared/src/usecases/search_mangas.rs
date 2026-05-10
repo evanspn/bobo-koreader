@@ -106,7 +106,7 @@ pub async fn search_mangas(
                                     vec![],
                                     Some(SearchError {
                                         source_id: source.manifest().info.id.clone(),
-                                        reason: "timeout".to_string(),
+                                        reason: "source did not respond in time".to_string(),
                                     }),
                                 )
                             }
