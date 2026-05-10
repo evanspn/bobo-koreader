@@ -640,14 +640,14 @@ impl BlockingSource {
             parse = |descriptor, store: &mut Store<WasmStore>, _| {
                 match store.data_mut()
                     .get_std_value(descriptor as usize)
-                    .ok_or(anyhow!("could not read data from page descriptor"))?
+                    .ok_or(anyhow!("source returned no search results — it may be down, blocked, or rate-limited"))?
                     .as_ref()
                 {
                     Value::Object(ObjectValue::MangaPageResult(MangaPageResult {
                         manga: mangas, ..
                     })) => Ok(mangas.clone()),
                     other => bail!(
-                        "expected page descriptor to be an array, found {:?} instead",
+                        "source returned unexpected data for search results (got {:?}) — it may need an update",
                         other
                     ),
                 }
@@ -706,12 +706,12 @@ impl BlockingSource {
             parse = |descriptor, store: &mut Store<WasmStore>, _| {
                 match store.data_mut()
                     .get_std_value(descriptor as usize)
-                    .ok_or(anyhow!("could not read data from manga details descriptor"))?
+                    .ok_or(anyhow!("source returned no manga details — it may be down, blocked, or rate-limited"))?
                     .as_ref()
                 {
                     Value::Object(ObjectValue::Manga(manga)) => Ok(manga.clone()),
                     other => bail!(
-                    "expected manga details descriptor to be a manga object, found {:?} instead",
+                    "source returned unexpected data for manga details (got {:?}) — it may need an update",
                     other
                 ),
                 }
@@ -811,7 +811,7 @@ impl BlockingSource {
         parse = |chapter_list_descriptor, store: &mut Store<WasmStore>, _| {
             Ok(match store.data_mut()
                 .get_std_value(chapter_list_descriptor as usize)
-                .ok_or(anyhow!("could not read data from chapter list descriptor"))?
+                .ok_or(anyhow!("source returned no chapter list — it may be down, blocked, or rate-limited"))?
                 .as_ref() {
                     Value::Array(array) => array
                         .iter()
@@ -834,9 +834,9 @@ impl BlockingSource {
                             _ => None,
                         })
                         .collect::<Option<Vec<_>>>()
-                        .ok_or(anyhow!("unexpected element in chapter array"))?,
+                        .ok_or(anyhow!("source returned a malformed entry in chapter list — it may need an update"))?,
                     other => bail!(
-                        "expected page descriptor to be an array, found {:?} instead",
+                        "source returned unexpected data for chapter list (got {:?}) — it may need an update",
                         other
                     ),
                 })
@@ -916,7 +916,7 @@ impl BlockingSource {
         parse = |page_list_descriptor, store: &mut Store<WasmStore>, _| {
             Ok(match store.data_mut()
             .get_std_value(page_list_descriptor as usize)
-            .ok_or(anyhow!("could not read data from page list descriptor"))?
+            .ok_or(anyhow!("source returned no pages for this chapter — it may be down, blocked, or rate-limited"))?
             .as_ref() {
                 Value::Array(array) => array
                     .iter()
@@ -925,9 +925,9 @@ impl BlockingSource {
                         _ => None,
                     })
                     .collect::<Option<Vec<_>>>()
-                    .ok_or(anyhow!("unexpected element in page array"))?,
+                    .ok_or(anyhow!("source returned a malformed entry in chapter pages — it may need an update"))?,
                 other => bail!(
-                    "expected page descriptor to be an array, found {:?} instead",
+                    "source returned unexpected data for chapter pages (got {:?}) — it may need an update",
                     other
                 ),
             })
