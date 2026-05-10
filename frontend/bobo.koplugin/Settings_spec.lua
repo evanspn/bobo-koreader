@@ -103,7 +103,18 @@ package.loaded["ui/widget/infomessage"]                   = stub_class()
 package.loaded["gettext+"]                                = function(s) return s end
 package.loaded["Paths"]                                   = paths_stub
 package.loaded["ui/font"]                                 = font_stub
-package.loaded["ui/widget/textwidget"]                    = stub_class()
+-- Recording TextWidget stub: keeps the contract of stub_class (new+init) but
+-- captures every constructor call so tests can assert that long-lived widgets
+-- (e.g. divider headers) are built with a max_width and won't bleed past the
+-- scrollable area on Kobo screens.
+local text_widget_calls = {}
+local text_widget_stub = stub_class()
+local _orig_new = text_widget_stub.new
+text_widget_stub.new = function(self, opts)
+  table.insert(text_widget_calls, opts or {})
+  return _orig_new(self, opts)
+end
+package.loaded["ui/widget/textwidget"]                    = text_widget_stub
 package.loaded["ui/widget/container/scrollablecontainer"] = stub_class({ getScrollbarWidth = function() return 6 end })
 package.loaded["ui/widget/button"]                        = stub_class()
 package.loaded["widgets/SettingItem"]                     = setting_item_stub
@@ -137,6 +148,7 @@ describe("Settings.fetchAndShow", function()
   before_each(function()
     shown_errors = {}
     shown_ui     = {}
+    text_widget_calls = {}
     error_dialog_stub.show = function(_, msg) table.insert(shown_errors, msg) end
     uimanager_stub.show    = function(_, w)   table.insert(shown_ui, w) end
   end)
@@ -175,5 +187,32 @@ describe("Settings.fetchAndShow", function()
 
     assert.equal(0, #shown_errors)
     assert.equal(1, #shown_ui)
+  end)
+
+  it("constrains every divider header TextWidget so it can't run off-screen", function()
+    backend_stub.getSettings = function() return make_success_response() end
+
+    Settings:fetchAndShow(function() end)
+
+    -- Find every TextWidget created from a divider definition. There must be
+    -- at least one (Settings ships with several dividers), and each must
+    -- have a finite max_width or the label overflows the scrollable area.
+    local divider_titles = {}
+    for _, def in ipairs(Settings.setting_value_definitions) do
+      if def[2].type == "divider" then
+        divider_titles[def[2].title] = true
+      end
+    end
+
+    local found_dividers = 0
+    for _, opts in ipairs(text_widget_calls) do
+      if divider_titles[opts.text] then
+        found_dividers = found_dividers + 1
+        assert.is_truthy(opts.max_width,
+          "divider TextWidget '" .. tostring(opts.text) .. "' missing max_width")
+        assert.is_true(opts.max_width > 0)
+      end
+    end
+    assert.is_true(found_dividers > 0, "expected at least one divider TextWidget")
   end)
 end)
