@@ -130,7 +130,15 @@ package.loaded["patch/MenuItemCover"]                = menu_item_cover_stub
 package.loaded["patch/MenuItemGrid"] = nil
 local MenuItemGrid = require("patch/MenuItemGrid")
 
-local TEXT_BAND_H = 36 -- must match TEXT_BAND_HEIGHT in MenuItemGrid.lua
+-- The text band height is computed at runtime from the actual title +
+-- timestamp TextWidget sizes (Screen:scaleBySize is identity in the
+-- stub, so the math is just integer addition). With the stub's
+-- getSize returning h = 16 for every TextWidget:
+--   top_pad(4) + title(16) + gap(2) + timestamp(16) + bottom_pad(2)
+--   + bottom_slack(4) = 44
+-- bottom_slack accounts for descender glyph tails ("g", "y", "p" in
+-- "hours" / "days") that paint slightly below getSize().h.
+local TEXT_BAND_H = 4 + 16 + 2 + 16 + 2 + 4
 
 local function build_instance(overrides)
   local inst = {
@@ -180,11 +188,21 @@ describe("MenuItemGrid card layout", function()
     local inst = build_instance()
     inst:init()
 
-    -- Cover height = card_height - text_band_h.
+    -- Cover height = card_height - text_band_h (computed from actual
+    -- title + timestamp TextWidget sizes — see TEXT_BAND_H comment above).
     -- card_height = dimen.h - 2 * CARD_INSET (3 each side) = 314.
-    -- text_band_h = 36 (Screen:scaleBySize is identity in tests).
     assert.equal(inst.dimen.w - 6, generated_cover._w)
     assert.equal(inst.dimen.h - 6 - TEXT_BAND_H, generated_cover._h)
+  end)
+
+  it("text band shrinks when no timestamp is supplied (title-only entries)", function()
+    local inst = build_instance({ mandatory = "" })
+    inst:init()
+
+    -- top_pad(4) + title(16) + bottom_pad(2) + bottom_slack(4) = 26 — no
+    -- inner gap, no timestamp height. Cover gets the freed pixels back.
+    local expected_band_h = 4 + 16 + 2 + 4
+    assert.equal(inst.dimen.h - 6 - expected_band_h, generated_cover._h)
   end)
 
   it("renders the title in bold black under the cover (not white over the cover art)", function()

@@ -28,11 +28,19 @@ local ACCENT_UNREAD = Blitbuffer.ColorRGB24(0xC0, 0x39, 0x2B)
 -- inset so cells line up flush across the grid.
 local CARD_INSET = 3
 
--- Vertical room reserved beneath the cover for the title + timestamp.
--- Tighter than KOReader's 44px default so the cover stays the visual focus
--- but the cover art is never obscured (overlaying the title on the cover
--- art was rejected — ate the bottom of every manga cover).
-local TEXT_BAND_HEIGHT = 36
+-- Padding around the text band. The band's actual height is computed from
+-- the title/timestamp TextWidget sizes — a fixed reserve was overflowing on
+-- some font configurations and bleeding into the next row.
+--
+-- BOTTOM_SLACK is extra room beneath the timestamp's baseline: TextWidget's
+-- getSize().h covers the font's logical metrics but the actual rendered
+-- glyph (especially with descenders like "g" / "y" / "p" in "hours" or
+-- "days") can extend a couple of px lower. Without slack, those tails get
+-- clipped by the next row of covers / by the action bar.
+local TEXT_BAND_TOP_PAD     = 4
+local TEXT_BAND_BOTTOM_PAD  = 2
+local TEXT_BAND_BOTTOM_SLACK = 4
+local TEXT_BAND_INNER_GAP   = 2
 
 local MenuItemGrid = MenuItemRaw:extend {}
 
@@ -56,16 +64,53 @@ function MenuItemGrid:init()
   }
 
   -- The card uses the full cell minus a small inset. The cover takes the
-  -- top portion; a tight text band beneath it carries the title and
-  -- timestamp. Title-on-cover overlays were tried previously but obscured
-  -- the bottom of the cover art on every manga (see the design doc).
+  -- top portion; a text band beneath it carries the title and timestamp.
+  -- Title-on-cover overlays were tried previously but obscured the bottom
+  -- of the cover art on every manga (see the design doc).
   local card_width  = self.dimen.w - 2 * CARD_INSET
   local card_height = self.dimen.h - 2 * CARD_INSET
-  local text_band_h = Screen:scaleBySize(TEXT_BAND_HEIGHT)
-  local cover_height = card_height - text_band_h
 
   self.face = Font:getFace(self.font, self.font_size)
 
+  -- Build the text widgets first so we know exactly how tall the text band
+  -- needs to be. A fixed reserve underestimated the title+timestamp height
+  -- at typical font sizes and the timestamp got clipped by the next row.
+  local title_pad_x = Screen:scaleBySize(4)
+  local text_max_width = card_width - 2 * title_pad_x
+
+  local title_widget = TextWidget:new {
+    text = self.text,
+    face = self.face,
+    max_width = text_max_width,
+    padding = 0,
+    bold = true,
+    fgcolor = self.dim and Blitbuffer.COLOR_DARK_GRAY or Blitbuffer.COLOR_BLACK,
+  }
+
+  local mandatory = self.mandatory_func and self.mandatory_func() or self.mandatory
+  local timestamp_widget
+  if mandatory and mandatory ~= "" then
+    timestamp_widget = TextWidget:new {
+      text = mandatory,
+      face = Font:getFace(self.infont, math.max(self.infont_size - 2, 11)),
+      max_width = text_max_width,
+      padding = 0,
+      bold = false,
+      fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+    }
+  end
+
+  local top_pad      = Screen:scaleBySize(TEXT_BAND_TOP_PAD)
+  local bottom_pad   = Screen:scaleBySize(TEXT_BAND_BOTTOM_PAD)
+  local bottom_slack = Screen:scaleBySize(TEXT_BAND_BOTTOM_SLACK)
+  local inner_gap    = Screen:scaleBySize(TEXT_BAND_INNER_GAP)
+  local title_h      = title_widget:getSize().h
+  local timestamp_h  = timestamp_widget and timestamp_widget:getSize().h or 0
+  local text_band_h  = top_pad + title_h
+    + (timestamp_widget and (inner_gap + timestamp_h) or 0)
+    + bottom_pad + bottom_slack
+
+  local cover_height = card_height - text_band_h
   local cover_widget = MenuItemCover.genCover(self, card_width, cover_height)
 
   -- Top-right unread badge. Built as an OverlapGroup with the cover so the
@@ -116,38 +161,14 @@ function MenuItemGrid:init()
     }
   end
 
-  -- Tight text band beneath the cover: bold black title (single line,
-  -- ellipsized) and a smaller dark-grey timestamp. The whole band is
-  -- background-less so it blends with the page; the cover's own black
-  -- border above provides the visual top edge of the cell.
-  local title_pad_x = Screen:scaleBySize(4)
-  local text_max_width = card_width - 2 * title_pad_x
-
-  local title_widget = TextWidget:new {
-    text = self.text,
-    face = self.face,
-    max_width = text_max_width,
-    padding = 0,
-    bold = true,
-    fgcolor = self.dim and Blitbuffer.COLOR_DARK_GRAY or Blitbuffer.COLOR_BLACK,
-  }
-
+  -- Stack the (already-built) title and timestamp into the text band frame.
   local text_stack = VerticalGroup:new {
     align = "left",
     title_widget,
   }
-
-  local mandatory = self.mandatory_func and self.mandatory_func() or self.mandatory
-  if mandatory and mandatory ~= "" then
-    table.insert(text_stack, VerticalSpan:new { width = Screen:scaleBySize(1) })
-    table.insert(text_stack, TextWidget:new {
-      text = mandatory,
-      face = Font:getFace(self.infont, math.max(self.infont_size - 2, 11)),
-      max_width = text_max_width,
-      padding = 0,
-      bold = false,
-      fgcolor = Blitbuffer.COLOR_DARK_GRAY,
-    })
+  if timestamp_widget then
+    table.insert(text_stack, VerticalSpan:new { width = inner_gap })
+    table.insert(text_stack, timestamp_widget)
   end
 
   local text_band = FrameContainer:new {
@@ -157,8 +178,8 @@ function MenuItemGrid:init()
     height = text_band_h,
     padding_left = title_pad_x,
     padding_right = title_pad_x,
-    padding_top = Screen:scaleBySize(3),
-    padding_bottom = 0,
+    padding_top = top_pad,
+    padding_bottom = bottom_pad + bottom_slack,
     text_stack,
   }
 

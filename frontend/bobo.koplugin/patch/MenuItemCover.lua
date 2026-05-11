@@ -425,7 +425,11 @@ end
 --- the bishop!!
 local scale_by_size = Screen:scaleBySize(1000000) * (1 / 1000000)
 function MenuItemCover:genCover(wleft_width, wleft_height)
-  local border_size = Size.border.thin
+  -- No visible border around real covers: the cover art is its own visual
+  -- boundary, and a black frame around every cover read as cluttered on
+  -- device. Empty (no-cover) cells keep a faint grey outline so they're
+  -- still distinguishable from the page background.
+  local empty_border_size = Size.border.thin
 
   local wleft
   if self.entry.manga_cover and starts_with(self.entry.manga_cover, "file://") then
@@ -448,7 +452,7 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
 
     wimage:_render()
 
-    -- Fixed-size bordered frame so every cover cell renders at identical
+    -- Fixed-size frame (no border) so every cover cell renders at identical
     -- outer dimensions regardless of the source image's aspect ratio. The
     -- inner CenterContainer letterboxes the (aspect-preserved) image.
     wleft = FrameContainer:new {
@@ -456,13 +460,12 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
       height = wleft_height,
       margin = 0,
       padding = 0,
-      bordersize = border_size,
+      bordersize = 0,
       dim = self.file_deleted,
-      color = Blitbuffer.COLOR_BLACK,
       CenterContainer:new {
         dimen = Geom:new {
-          w = wleft_width - 2 * border_size,
-          h = wleft_height - 2 * border_size,
+          w = wleft_width,
+          h = wleft_height,
         },
         wimage,
       },
@@ -483,20 +486,21 @@ function MenuItemCover:genCover(wleft_width, wleft_height)
       return font_size
     end
 
-    -- Fixed-size frame matches the real-cover branch so empty cells line up
-    -- with cover cells in the grid.
+    -- Empty-cell placeholder keeps a faint outline so it's distinguishable
+    -- from the page background. Real-cover cells use the art itself as the
+    -- visual boundary and have no border at all.
     wleft = FrameContainer:new {
       width = wleft_width,
       height = wleft_height,
       margin = 0,
       padding = 0,
-      bordersize = border_size,
+      bordersize = empty_border_size,
       dim = self.file_deleted,
-      color = Blitbuffer.COLOR_BLACK,
+      color = Blitbuffer.COLOR_GRAY_9,
       CenterContainer:new {
         dimen = Geom:new {
-          w = wleft_width - 2 * border_size,
-          h = wleft_height - 2 * border_size,
+          w = wleft_width - 2 * empty_border_size,
+          h = wleft_height - 2 * empty_border_size,
         },
         TextWidget:new {
           text = "⛶", -- U+26F6 Square four corners
