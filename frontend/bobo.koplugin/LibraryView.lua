@@ -51,6 +51,7 @@ local MenuItemGrid = require("patch/MenuItemGrid")
 local MenuCustom = require("patch/MenuCustom")
 local PlaylistDialog = require("PlaylistDialog")
 local ActionBar = require("widgets/ActionBar")
+local LibraryTabs = require("widgets/LibraryTabs")
 
 local DGENERIC_ICON_SIZE = G_defaults:readSetting("DGENERIC_ICON_SIZE")
 local SMALL_FONT_FACE = Font:getFace("smallffont")
@@ -89,9 +90,80 @@ function LibraryView:init()
   self:patchTitleBar(0)
   self:fetchCountNotification()
   self:_installActionBar()
+  self:_installPlaylistTabs()
 
   -- fix bottom bar size
   self:updateItems()
+end
+
+--- @private
+--- Fetch the user's playlists and install a tab strip above the manga grid.
+--- The first tab is always "Library" (current_playlist = nil); each remaining
+--- tab corresponds to a saved playlist. Tapping a tab calls fetchAndShow
+--- with the matching playlist (or nil for the Library default).
+---
+--- Inject the strip into self.content_group at index 2 — KOReader's BaseMenu
+--- builds content_group as VerticalGroup[header, body] during init, and
+--- self.content_group is exposed as an instance field. Mutating it in place
+--- is the same trick we use for self.page_info / the action bar.
+function LibraryView:_installPlaylistTabs()
+  if not self.content_group then return end
+  local r = Backend.getPlaylists()
+  if r.type ~= 'SUCCESS' then return end
+  local playlists = r.body or {}
+
+  local current_id = self.current_playlist and self.current_playlist.id or nil
+  local tabs = { {
+    label = _("Library"),
+    id = nil,
+    selected = current_id == nil,
+  } }
+  for _, p in ipairs(playlists) do
+    table.insert(tabs, {
+      label = p.name,
+      id = p.id,
+      selected = current_id == p.id,
+    })
+  end
+
+  -- Single-tab installs (no playlists) get no strip — there's nothing to
+  -- switch to and the row would just be wasted vertical space.
+  if #tabs < 2 then
+    self.library_tabs = nil
+    return
+  end
+
+  local playlist_by_id = {}
+  for _, p in ipairs(playlists) do playlist_by_id[p.id] = p end
+
+  self.library_tabs = LibraryTabs:new {
+    width = Screen:getWidth(),
+    show_parent = self,
+    tabs = tabs,
+    on_select = function(tab)
+      if (tab.id == nil and self.current_playlist == nil)
+        or (self.current_playlist and tab.id == self.current_playlist.id) then
+        return -- already on this tab
+      end
+      local next_playlist = tab.id and playlist_by_id[tab.id] or nil
+      self:fetchAndShow(next_playlist)
+      self:onClose()
+    end,
+  }
+
+  table.insert(self.content_group, 2, self.library_tabs)
+  self.content_group:resetLayout()
+end
+
+--- @private
+--- Bottom-bar Library button: jump back to the default Library view
+--- (clears any selected playlist). Same effect as tapping the "Library"
+--- tab in the top strip, exposed here too because the strip can be far
+--- away on a busy library with many playlists.
+function LibraryView:_jumpToLibraryTab()
+  if self.current_playlist == nil then return end
+  self:fetchAndShow(nil)
+  self:onClose()
 end
 
 --- @private
@@ -112,9 +184,9 @@ function LibraryView:_installActionBar()
         callback = function() self:openSearchMangasDialog() end,
       },
       {
-        glyph = Icons.FA_LIST,
-        label = _("Playlists"),
-        callback = function() self:openPlaylistDialog() end,
+        glyph = Icons.COD_LIBRARY,
+        label = _("Library"),
+        callback = function() self:_jumpToLibraryTab() end,
       },
       {
         glyph = Icons.FA_TH_LARGE,
@@ -137,7 +209,7 @@ function LibraryView:_installActionBar()
         callback = function() self:openMenu() end,
       },
       {
-        glyph = Icons.FA_REMOVE,
+        glyph = Icons.FA_TIMES,
         label = _("Close"),
         callback = function() self:onClose() end,
       },
@@ -347,11 +419,32 @@ function LibraryView:updateItems()
 end
 
 --- @private
+--- KOReader's _recalculateDimen sizes the items area from inner_dimen.h
+--- minus the title bar and the page_info row. It doesn't know about the
+--- playlist tab strip we injected into content_group, so without
+--- intervention the bottom row of mangas would draw underneath the strip
+--- (same shape as the page_info issue we hit with the action bar).
+---
+--- Trick: temporarily shrink inner_dimen.h by the tab strip's height for
+--- the duration of the parent's recalc, then restore. That makes
+--- available_height = inner_dimen.h - others_height come out smaller, so
+--- items_per_page (and the per-cell height it derives) leaves the tab
+--- strip its allotted space.
 function LibraryView:_recalculateDimen(flag)
+  local original_inner_h
+  if self.library_tabs and self.inner_dimen then
+    original_inner_h = self.inner_dimen.h
+    self.inner_dimen.h = self.inner_dimen.h - self.library_tabs:getSize().h
+  end
+
   if self:getLibraryViewMode() ~= "base" then
     MenuCustom._recalculateDimen(self, flag)
   else
     Menu._recalculateDimen(self, flag)
+  end
+
+  if original_inner_h then
+    self.inner_dimen.h = original_inner_h
   end
 end
 
@@ -862,6 +955,13 @@ function LibraryView:openMenu()
       },
     },
     {
+      {
+        text = Icons.FA_LIST .. " " .. _("Manage playlists"),
+        callback = function()
+          UIManager:close(dialog)
+          self:openPlaylistDialog()
+        end
+      },
       {
         text = Icons.FA_PLUG .. " " .. _("Manage sources"),
         callback = function()

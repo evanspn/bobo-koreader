@@ -114,6 +114,7 @@ package.loaded["Backend"]                     = {
   findOrphanOrReadFiles = function() return { type = "SUCCESS", body = { filenames = {}, total_text = "" } } end,
   removeFile = function() return { type = "SUCCESS" } end,
   listInstalledSources = function() return { type = "SUCCESS", body = {} } end,
+  getPlaylists = function() return { type = "SUCCESS", body = {} } end,
   cleanup = noop,
   initialize = noop,
   createCancelId = function() return 1 end,
@@ -148,6 +149,7 @@ package.loaded["patch/MenuItemCover"]         = stub_class()
 package.loaded["patch/MenuItemGrid"]          = stub_class()
 package.loaded["PlaylistDialog"]              = { fetchAndShow = noop }
 package.loaded["widgets/ActionBar"]           = stub_class()
+package.loaded["widgets/LibraryTabs"]         = stub_class()
 
 package.loaded["LibraryView"] = nil
 local LibraryView = require("LibraryView")
@@ -307,7 +309,10 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     end
 
     assert.is_nil(find("Search for mangas"), "Search lives on the bottom bar; not in the More overflow")
-    assert.is_nil(find("Playlists"),         "Playlists lives on the bottom bar; not in the More overflow")
+    -- Playlist switching now happens via the top tab strip, so the
+    -- "Playlists" bar button is gone. The More overflow still surfaces
+    -- "Manage playlists" so users can create/rename/delete them.
+    assert.is_not_nil(find("Manage playlists"), "Manage playlists must stay accessible from the More overflow")
     assert.is_nil(find("Refresh mangas"),    "Refresh lives on the bottom bar; not in the More overflow")
     -- "Settings" must not appear as a top-level entry, but "Settings" the
     -- substring shouldn't matter because nothing else uses it.
@@ -339,5 +344,57 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.is_not_nil(notify_btn, "openMenu must include a Notifications entry (replaces the title-bar bell)")
     assert.is_truthy(notify_btn.text:find("(7)", 1, true),
       "the entry should display the unread count when count > 0")
+  end)
+
+  it("_jumpToLibraryTab is a no-op when already on the Library tab", function()
+    local view = make_view()
+    local fetch_calls = 0
+    view.fetchAndShow = function() fetch_calls = fetch_calls + 1 end
+    view.current_playlist = nil
+
+    view:_jumpToLibraryTab()
+    assert.equal(0, fetch_calls)
+  end)
+
+  it("_jumpToLibraryTab clears the current playlist and reopens the default Library", function()
+    local view = make_view()
+    local got_arg = "unset"
+    view.fetchAndShow = function(_, arg) got_arg = arg end
+    view.current_playlist = { id = "p1", name = "Reading" }
+
+    view:_jumpToLibraryTab()
+    assert.is_nil(got_arg, "_jumpToLibraryTab must call fetchAndShow(nil) to clear the playlist filter")
+  end)
+
+  it("_installPlaylistTabs inserts a Library + per-playlist strip into content_group", function()
+    local view = make_view()
+    local content_group = setmetatable({}, { __index = { resetLayout = function() end } })
+    view.content_group = content_group
+    package.loaded["Backend"].getPlaylists = function()
+      return { type = "SUCCESS", body = {
+        { id = "p1", name = "Reading" },
+        { id = "p2", name = "Done" },
+      } }
+    end
+
+    view:_installPlaylistTabs()
+
+    assert.is_not_nil(view.library_tabs, "tabs widget should be stashed on self.library_tabs")
+    assert.equal(view.library_tabs, content_group[2],
+      "tabs strip must be inserted at index 2 (after header, before body)")
+  end)
+
+  it("_installPlaylistTabs skips installation when the user has no playlists", function()
+    -- With only the implicit Library tab there's nothing to switch to,
+    -- so the strip would be wasted vertical space.
+    local view = make_view()
+    view.content_group = setmetatable({}, { __index = { resetLayout = function() end } })
+    package.loaded["Backend"].getPlaylists = function()
+      return { type = "SUCCESS", body = {} }
+    end
+
+    view:_installPlaylistTabs()
+
+    assert.is_nil(view.library_tabs, "library_tabs must be nil when only the Library tab would exist")
   end)
 end)
