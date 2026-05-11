@@ -156,17 +156,6 @@ function LibraryView:_installPlaylistTabs()
 end
 
 --- @private
---- Bottom-bar Library button: jump back to the default Library view
---- (clears any selected playlist). Same effect as tapping the "Library"
---- tab in the top strip, exposed here too because the strip can be far
---- away on a busy library with many playlists.
-function LibraryView:_jumpToLibraryTab()
-  if self.current_playlist == nil then return end
-  self:fetchAndShow(nil)
-  self:onClose()
-end
-
---- @private
 --- Replace KOReader's pagination chevron row with a persistent action bar
 --- (Search · Playlists · View · Refresh · Settings · More · Close) plus a
 --- small "Page X of Y" label below. Sort moved into the More overflow per
@@ -182,11 +171,6 @@ function LibraryView:_installActionBar()
         glyph = Icons.FA_MAGNIFYING_GLASS,
         label = _("Search"),
         callback = function() self:openSearchMangasDialog() end,
-      },
-      {
-        glyph = Icons.COD_LIBRARY,
-        label = _("Library"),
-        callback = function() self:_jumpToLibraryTab() end,
       },
       {
         glyph = Icons.FA_TH_LARGE,
