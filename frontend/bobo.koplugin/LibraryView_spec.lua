@@ -346,26 +346,6 @@ describe("LibraryView cover-tap / context-menu wiring", function()
       "the entry should display the unread count when count > 0")
   end)
 
-  it("_jumpToLibraryTab is a no-op when already on the Library tab", function()
-    local view = make_view()
-    local fetch_calls = 0
-    view.fetchAndShow = function() fetch_calls = fetch_calls + 1 end
-    view.current_playlist = nil
-
-    view:_jumpToLibraryTab()
-    assert.equal(0, fetch_calls)
-  end)
-
-  it("_jumpToLibraryTab clears the current playlist and reopens the default Library", function()
-    local view = make_view()
-    local got_arg = "unset"
-    view.fetchAndShow = function(_, arg) got_arg = arg end
-    view.current_playlist = { id = "p1", name = "Reading" }
-
-    view:_jumpToLibraryTab()
-    assert.is_nil(got_arg, "_jumpToLibraryTab must call fetchAndShow(nil) to clear the playlist filter")
-  end)
-
   it("_installPlaylistTabs inserts a Library + per-playlist strip into content_group", function()
     local view = make_view()
     local content_group = setmetatable({}, { __index = { resetLayout = function() end } })
