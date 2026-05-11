@@ -37,4 +37,5 @@ return {
   FA_PALETTE           = "\u{f53f}",
   FA_CHART_BAR         = "\u{f080}",
   FA_TH_LARGE          = "\u{f009}",
+  FA_TIMES             = "\u{f00d}",
 }
