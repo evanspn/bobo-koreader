@@ -254,6 +254,41 @@ function Backend.getMangasInLibrary()
   })
 end
 
+--- @class LibraryStatsWeek
+--- @field start integer    Unix timestamp at Monday 00:00 UTC of the week.
+--- @field chapters integer Chapters marked read inside that week.
+
+--- @class LibraryStatsTopManga
+--- @field source_id string
+--- @field manga_id string
+--- @field title string
+--- @field chapters_read integer
+--- @field last_read integer|nil
+
+--- @class LibraryStatsGenre
+--- @field name string
+--- @field manga_count integer
+
+--- @class LibraryStats
+--- @field chapters_read integer
+--- @field mangas_read integer
+--- @field last_read integer|nil
+--- @field current_streak_days integer
+--- @field longest_streak_days integer
+--- @field days_active integer
+--- @field weeks LibraryStatsWeek[]
+--- @field top_manga LibraryStatsTopManga[]
+--- @field top_genres LibraryStatsGenre[]
+
+--- Reading stats scoped to the active profile (whichever profile's
+--- database the backend is currently pointing at).
+--- @return SuccessfulResponse<LibraryStats>|ErrorResponse
+function Backend.getLibraryStats()
+  return Backend.requestJson({
+    path = "/library/stats",
+  })
+end
+
 --- Lists path files invalidate
 --- @param modeInvalid boolean
 --- @return SuccessfulResponse<FileSummary>|ErrorResponse

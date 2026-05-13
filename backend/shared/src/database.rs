@@ -2916,6 +2916,113 @@ impl Database {
 
         Ok(mangas)
     }
+
+    /// Totals across every chapter ever marked as read.
+    pub async fn read_chapters_total(&self) -> Result<ReadChaptersTotal> {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                COUNT(*) AS "chapters!: i64",
+                COUNT(DISTINCT source_id || '|' || manga_id) AS "mangas!: i64",
+                MAX(last_read) AS "last_read?: i64"
+            FROM chapter_state
+            WHERE read = 1
+            "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(ReadChaptersTotal {
+            chapters: row.chapters,
+            mangas: row.mangas,
+            last_read: row.last_read,
+        })
+    }
+
+    /// All read events with their unix-epoch timestamps. Used to bin
+    /// reads into weeks and to compute reading streaks.
+    pub async fn read_chapter_timestamps(&self) -> Result<Vec<i64>> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT last_read AS "last_read!: i64"
+            FROM chapter_state
+            WHERE read = 1 AND last_read IS NOT NULL
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.last_read).collect())
+    }
+
+    /// One row per manga the user has marked any chapter of as read.
+    /// `title` falls back to the manga id if no cached title is known.
+    pub async fn read_manga_summary(&self) -> Result<Vec<ReadMangaSummary>> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                cs.source_id AS "source_id!: String",
+                cs.manga_id  AS "manga_id!: String",
+                COALESCE(mi.title, cs.manga_id) AS "title!: String",
+                COUNT(*) AS "chapters_read!: i64",
+                MAX(cs.last_read) AS "last_read?: i64"
+            FROM chapter_state cs
+            LEFT JOIN manga_informations mi
+              ON mi.source_id = cs.source_id AND mi.manga_id = cs.manga_id
+            WHERE cs.read = 1
+            GROUP BY cs.source_id, cs.manga_id
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ReadMangaSummary {
+                source_id: r.source_id,
+                manga_id: r.manga_id,
+                title: r.title,
+                chapters_read: r.chapters_read,
+                last_read: r.last_read,
+            })
+            .collect())
+    }
+
+    /// Cached `tags` JSON (or NULL) per manga the user has actually read.
+    /// Returned for in-Rust aggregation; doesn't depend on the SQLite
+    /// JSON1 extension being available.
+    pub async fn read_manga_tags(&self) -> Result<Vec<Option<String>>> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT md.tags AS "tags?: String"
+            FROM manga_details md
+            WHERE EXISTS (
+                SELECT 1 FROM chapter_state cs
+                WHERE cs.source_id = md.source_id
+                  AND cs.manga_id  = md.id
+                  AND cs.read = 1
+            )
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.tags).collect())
+    }
+}
+
+/// Totals computed across every read chapter row in the active profile.
+pub struct ReadChaptersTotal {
+    pub chapters: i64,
+    pub mangas: i64,
+    pub last_read: Option<i64>,
+}
+
+/// Per-manga read totals used to compute "top manga read" lists.
+pub struct ReadMangaSummary {
+    pub source_id: String,
+    pub manga_id: String,
+    pub title: String,
+    pub chapters_read: i64,
+    pub last_read: Option<i64>,
 }
 
 /// Represents a manga entry in the user's library, joined with its information

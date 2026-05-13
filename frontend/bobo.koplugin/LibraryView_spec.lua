@@ -115,6 +115,8 @@ package.loaded["Backend"]                     = {
   removeFile = function() return { type = "SUCCESS" } end,
   listInstalledSources = function() return { type = "SUCCESS", body = {} } end,
   getPlaylists = function() return { type = "SUCCESS", body = {} } end,
+  listProfiles = function() return { type = "SUCCESS", body = {} } end,
+  getLibraryStats = function() return { type = "SUCCESS", body = {} } end,
   cleanup = noop,
   initialize = noop,
   createCancelId = function() return 1 end,
@@ -148,6 +150,7 @@ package.loaded["patch/MenuCustom"]            = stub_class({ init = noop, update
 package.loaded["patch/MenuItemCover"]         = stub_class()
 package.loaded["patch/MenuItemGrid"]          = stub_class()
 package.loaded["PlaylistDialog"]              = { fetchAndShow = noop }
+package.loaded["StatisticsView"]              = { fetchAndShow = noop }
 package.loaded["widgets/ActionBar"]           = stub_class()
 package.loaded["widgets/LibraryTabs"]         = stub_class()
 
@@ -367,6 +370,64 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.is_not_nil(find("Manage sources"),     "Sources management stays in the overflow")
     assert.is_not_nil(find("Check for updates"),  "Update check stays in the overflow")
     assert.is_not_nil(find("Sync Database"),      "Sync stays in the overflow")
+    assert.is_not_nil(find("Statistics"),         "Statistics opens the per-profile stats view from the overflow")
+  end)
+
+  it("openMenu's Statistics entry calls openStatistics", function()
+    local view = make_view()
+    local calls = 0
+    view.openStatistics = function() calls = calls + 1 end
+
+    view:openMenu()
+    assert.is_not_nil(last_button_dialog)
+
+    local stats_btn
+    for _, row in ipairs(last_button_dialog.buttons) do
+      for _, btn in ipairs(row) do
+        if type(btn.text) == "string" and btn.text:find("Statistics", 1, true) then
+          stats_btn = btn
+        end
+      end
+    end
+    assert.is_not_nil(stats_btn, "openMenu must surface a Statistics entry")
+    stats_btn.callback()
+    assert.equal(1, calls)
+  end)
+
+  it("openStatistics passes the active profile's name to StatisticsView", function()
+    local view = make_view()
+    package.loaded["Backend"].listProfiles = function()
+      return { type = "SUCCESS", body = {
+        { id = 1, name = "Other", active = false },
+        { id = 2, name = "Reader", active = true },
+      } }
+    end
+    local captured_name
+    package.loaded["StatisticsView"].fetchAndShow = function(_, name)
+      captured_name = name
+    end
+
+    view:openStatistics()
+
+    assert.equal("Reader", captured_name)
+  end)
+
+  it("openStatistics passes nil when no profile is active (e.g. profiles call errors)", function()
+    local view = make_view()
+    package.loaded["Backend"].listProfiles = function()
+      return { type = "ERROR", message = "boom" }
+    end
+    local called = false
+    local captured_name = "sentinel"
+    package.loaded["StatisticsView"].fetchAndShow = function(_, name)
+      called = true
+      captured_name = name
+    end
+
+    view:openStatistics()
+
+    assert.is_true(called)
+    assert.is_nil(captured_name)
   end)
 
   it("openMenu surfaces the notification entry with the current unread count", function()

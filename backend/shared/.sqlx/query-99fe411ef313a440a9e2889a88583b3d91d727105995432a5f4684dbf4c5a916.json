@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT md.tags AS \"tags?: String\"\n            FROM manga_details md\n            WHERE EXISTS (\n                SELECT 1 FROM chapter_state cs\n                WHERE cs.source_id = md.source_id\n                  AND cs.manga_id  = md.id\n                  AND cs.read = 1\n            )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "tags?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "99fe411ef313a440a9e2889a88583b3d91d727105995432a5f4684dbf4c5a916"
+}

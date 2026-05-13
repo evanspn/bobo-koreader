@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                COUNT(*) AS \"chapters!: i64\",\n                COUNT(DISTINCT source_id || '|' || manga_id) AS \"mangas!: i64\",\n                MAX(last_read) AS \"last_read?: i64\"\n            FROM chapter_state\n            WHERE read = 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "chapters!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "mangas!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_read?: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "8a2f82bdfa7bc88c852057e760cb965ebcb4d893bd141d9aa71cf562cb7c44e2"
+}

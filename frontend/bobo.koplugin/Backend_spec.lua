@@ -67,3 +67,21 @@ describe("Backend.getStoredChapter", function()
     assert.equal("/mangas/src/manga1/chapters/ch1/stored", captured.path)
   end)
 end)
+
+describe("Backend.getLibraryStats", function()
+  it("issues a GET to /library/stats", function()
+    local captured
+    Backend.requestJson = function(req)
+      captured = req
+      return { type = "SUCCESS", body = {} }
+    end
+
+    Backend.getLibraryStats()
+
+    assert.is_not_nil(captured)
+    assert.equal("/library/stats", captured.path)
+    -- Default method is GET — we shouldn't be passing a body or method override.
+    assert.is_nil(captured.method)
+    assert.is_nil(captured.body)
+  end)
+end)
