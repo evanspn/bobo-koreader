@@ -266,7 +266,7 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.equal(1, install_calls)
   end)
 
-  it("_installActionBar omits a Close action — the tab strip is the persistent root", function()
+  it("_installActionBar includes Close on the home tab (current_playlist == nil)", function()
     -- Capture the actions list passed to ActionBar.new so we can inspect the
     -- buttons _installActionBar wired up. The default stub_class swallows
     -- opts; override new locally to expose them.
@@ -277,14 +277,33 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     end
 
     local view = make_view()
-    -- _installActionBar bails before touching page_info when those fields
-    -- are missing, which is exactly the path we want for this test.
+    view.current_playlist = nil
+    view:_installActionBar()
+
+    assert.is_not_nil(captured_actions, "_installActionBar must construct an ActionBar")
+    local has_close = false
+    for _, action in ipairs(captured_actions) do
+      if action.label == "Close" then has_close = true end
+    end
+    assert.is_true(has_close,
+      "Close belongs on the landing screen so the user can exit the plugin")
+  end)
+
+  it("_installActionBar omits Close on a playlist tab to prevent accidental plugin exits", function()
+    local captured_actions
+    package.loaded["widgets/ActionBar"].new = function(_, opts)
+      captured_actions = opts.actions
+      return opts
+    end
+
+    local view = make_view()
+    view.current_playlist = { id = "p1", name = "Reading" }
     view:_installActionBar()
 
     assert.is_not_nil(captured_actions, "_installActionBar must construct an ActionBar")
     for _, action in ipairs(captured_actions) do
       assert.not_equal("Close", action.label,
-        "Close button was removed so the playlist tab strip is always reachable")
+        "Close must not appear on a playlist tab — too easy to mis-tap mid-browse")
     end
   end)
 
