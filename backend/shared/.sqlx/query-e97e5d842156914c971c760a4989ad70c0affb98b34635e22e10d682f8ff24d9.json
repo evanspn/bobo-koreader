@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT last_read AS \"last_read!: i64\"\n            FROM chapter_state\n            WHERE read = 1 AND last_read IS NOT NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_read!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "e97e5d842156914c971c760a4989ad70c0affb98b34635e22e10d682f8ff24d9"
+}

@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                cs.source_id AS \"source_id!: String\",\n                cs.manga_id  AS \"manga_id!: String\",\n                COALESCE(mi.title, cs.manga_id) AS \"title!: String\",\n                COUNT(*) AS \"chapters_read!: i64\",\n                MAX(cs.last_read) AS \"last_read?: i64\"\n            FROM chapter_state cs\n            LEFT JOIN manga_informations mi\n              ON mi.source_id = cs.source_id AND mi.manga_id = cs.manga_id\n            WHERE cs.read = 1\n            GROUP BY cs.source_id, cs.manga_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "source_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "manga_id!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "title!: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "chapters_read!: i64",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_read?: i64",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "10e3ac1ebb2d64bd41e50a1722096e9ff5fb962e91aa80872829cf04cb75f310"
+}

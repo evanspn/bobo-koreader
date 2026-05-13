@@ -50,6 +50,7 @@ local MenuItemCover = require("patch/MenuItemCover")
 local MenuItemGrid = require("patch/MenuItemGrid")
 local MenuCustom = require("patch/MenuCustom")
 local PlaylistDialog = require("PlaylistDialog")
+local StatisticsView = require("StatisticsView")
 local ActionBar = require("widgets/ActionBar")
 local LibraryTabs = require("widgets/LibraryTabs")
 
@@ -934,6 +935,15 @@ function LibraryView:openMenu()
     },
     {
       {
+        text = Icons.FA_CHART_BAR .. " " .. _("Statistics"),
+        callback = function()
+          UIManager:close(dialog)
+          self:openStatistics()
+        end
+      },
+    },
+    {
+      {
         text = Icons.REFRESHING .. " " .. _("Refresh details"),
         callback = function()
           UIManager:close(dialog)
@@ -1071,6 +1081,28 @@ function LibraryView:openMenu()
   UIManager:show(dialog)
 
   Testing:emitEvent('library_view_menu_opened')
+end
+
+--- @private
+--- Show the per-profile reading stats overlay. The backend is already
+--- pointed at the active profile's database (DB pool swap on profile
+--- switch), so the stats are implicitly scoped — we just ask the
+--- profile name for the title bar.
+function LibraryView:openStatistics()
+  local profile_name
+  local profiles_response = Backend.listProfiles()
+  if profiles_response.type == 'SUCCESS' then
+    for _i, profile in ipairs(profiles_response.body) do
+      if profile.active then
+        profile_name = profile.name
+        break
+      end
+    end
+  end
+
+  Trapper:wrap(function()
+    StatisticsView:fetchAndShow(profile_name)
+  end)
 end
 
 ---@private

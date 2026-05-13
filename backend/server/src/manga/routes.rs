@@ -31,6 +31,7 @@ fn path_to_file_url(path: &std::path::Path) -> Option<url::Url> {
 pub fn routes() -> Router<State> {
     Router::new()
         .route("/library", get(get_manga_library))
+        .route("/library/stats", get(get_library_stats))
         .route("/find-orphan-or-read-files", get(find_orphan_or_read_files))
         .route("/delete-file", post(delete_file))
         .route("/sync-database", post(sync_database))
@@ -143,6 +144,14 @@ async fn get_manga_library(
     Ok(Json(
         mangas.into_iter().map(Manga::from).collect::<Vec<_>>(),
     ))
+}
+
+async fn get_library_stats(
+    StateExtractor(State { database, .. }): StateExtractor<State>,
+) -> Result<Json<usecases::LibraryStats>, AppError> {
+    let database = database.lock().await;
+    let stats = usecases::get_library_stats(&database).await?;
+    Ok(Json(stats))
 }
 
 async fn find_orphan_or_read_files(
