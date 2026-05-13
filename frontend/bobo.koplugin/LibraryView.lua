@@ -161,40 +161,52 @@ end
 --- label below. Sort moved into the More overflow per user feedback
 --- ("I don't need filter that quickly accessible"). The top bar's
 --- hamburger / bell collapsed down here so the page is one consistent
---- interaction zone. The tab strip at the top is the persistent navigation
---- root, so there's no Close action — KOReader's back gesture dismisses
---- the plugin.
+--- interaction zone.
+---
+--- The Close (X) button is appended only on the home/landing screen
+--- (current_playlist == nil). On a playlist tab it would be too easy to
+--- mis-tap and dump the whole plugin while the user is mid-browse, so
+--- those screens rely on the tab strip / back gesture instead.
 function LibraryView:_installActionBar()
+  local actions = {
+    {
+      glyph = Icons.FA_MAGNIFYING_GLASS,
+      label = _("Search"),
+      callback = function() self:openSearchMangasDialog() end,
+    },
+    {
+      glyph = Icons.FA_TH_LARGE,
+      label = _("View"),
+      callback = function() self:_cycleViewMode() end,
+    },
+    {
+      glyph = Icons.REFRESHING,
+      label = _("Refresh"),
+      callback = function() self:refreshAllChapters() end,
+    },
+    {
+      glyph = Icons.FA_GEAR,
+      label = _("Settings"),
+      callback = function() self:openSettings() end,
+    },
+    {
+      glyph = Icons.FA_ELLIPSIS_VERTICAL,
+      label = _("More"),
+      callback = function() self:openMenu() end,
+    },
+  }
+  if self.current_playlist == nil then
+    table.insert(actions, {
+      glyph = Icons.FA_TIMES,
+      label = _("Close"),
+      callback = function() self:onClose() end,
+    })
+  end
+
   local action_bar = ActionBar:new {
     width = Screen:getWidth(),
     show_parent = self,
-    actions = {
-      {
-        glyph = Icons.FA_MAGNIFYING_GLASS,
-        label = _("Search"),
-        callback = function() self:openSearchMangasDialog() end,
-      },
-      {
-        glyph = Icons.FA_TH_LARGE,
-        label = _("View"),
-        callback = function() self:_cycleViewMode() end,
-      },
-      {
-        glyph = Icons.REFRESHING,
-        label = _("Refresh"),
-        callback = function() self:refreshAllChapters() end,
-      },
-      {
-        glyph = Icons.FA_GEAR,
-        label = _("Settings"),
-        callback = function() self:openSettings() end,
-      },
-      {
-        glyph = Icons.FA_ELLIPSIS_VERTICAL,
-        label = _("More"),
-        callback = function() self:openMenu() end,
-      },
-    },
+    actions = actions,
   }
 
   -- Mutate self.page_info IN PLACE rather than reassigning. KOReader's
