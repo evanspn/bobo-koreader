@@ -266,6 +266,28 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.equal(1, install_calls)
   end)
 
+  it("_installActionBar omits a Close action — the tab strip is the persistent root", function()
+    -- Capture the actions list passed to ActionBar.new so we can inspect the
+    -- buttons _installActionBar wired up. The default stub_class swallows
+    -- opts; override new locally to expose them.
+    local captured_actions
+    package.loaded["widgets/ActionBar"].new = function(_, opts)
+      captured_actions = opts.actions
+      return opts
+    end
+
+    local view = make_view()
+    -- _installActionBar bails before touching page_info when those fields
+    -- are missing, which is exactly the path we want for this test.
+    view:_installActionBar()
+
+    assert.is_not_nil(captured_actions, "_installActionBar must construct an ActionBar")
+    for _, action in ipairs(captured_actions) do
+      assert.not_equal("Close", action.label,
+        "Close button was removed so the playlist tab strip is always reachable")
+    end
+  end)
+
   it("_cycleViewMode advances through grid -> cover -> base -> grid and persists the choice", function()
     local view = make_view()
     local persisted = {}

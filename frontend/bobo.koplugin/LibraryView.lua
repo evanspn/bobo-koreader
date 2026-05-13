@@ -157,11 +157,13 @@ end
 
 --- @private
 --- Replace KOReader's pagination chevron row with a persistent action bar
---- (Search · Playlists · View · Refresh · Settings · More · Close) plus a
---- small "Page X of Y" label below. Sort moved into the More overflow per
---- user feedback ("I don't need filter that quickly accessible"). The top
---- bar's hamburger / bell / close also collapsed down here so the page is
---- one consistent interaction zone.
+--- (Search · View · Refresh · Settings · More) plus a small "Page X of Y"
+--- label below. Sort moved into the More overflow per user feedback
+--- ("I don't need filter that quickly accessible"). The top bar's
+--- hamburger / bell collapsed down here so the page is one consistent
+--- interaction zone. The tab strip at the top is the persistent navigation
+--- root, so there's no Close action — KOReader's back gesture dismisses
+--- the plugin.
 function LibraryView:_installActionBar()
   local action_bar = ActionBar:new {
     width = Screen:getWidth(),
@@ -191,11 +193,6 @@ function LibraryView:_installActionBar()
         glyph = Icons.FA_ELLIPSIS_VERTICAL,
         label = _("More"),
         callback = function() self:openMenu() end,
-      },
-      {
-        glyph = Icons.FA_TIMES,
-        label = _("Close"),
-        callback = function() self:onClose() end,
       },
     },
   }
@@ -355,10 +352,11 @@ end
 
 --- @private
 --- @param count_notify number
---- The title bar is now title-only — every action that lived here (menu
---- overflow, notification bell, close) moved into the bottom action bar
---- so the user has one consistent interaction zone. Notification count is
---- stashed for the Notifications entry inside the More menu.
+--- The title bar is now title-only — the menu overflow and notification
+--- bell moved into the bottom action bar so the user has one consistent
+--- interaction zone, and there's no explicit close (back gesture handles
+--- that). Notification count is stashed for the Notifications entry
+--- inside the More menu.
 function LibraryView:patchTitleBar(count_notify)
   self._notify_count = count_notify or 0
 
