@@ -11,11 +11,12 @@ local LoadingDialog = require("LoadingDialog")
 ---@diagnostic disable-next-line: different-requires
 local util = require("util")
 local _ = require("gettext+")
-local IconButton = require("ui/widget/iconbutton")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
+local HorizontalSpan = require("ui/widget/horizontalspan")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
 local Button = require("ui/widget/button")
+local ActionBar = require("widgets/ActionBar")
 local md5 = require("ffi/sha2").md5
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
@@ -74,11 +75,6 @@ local ChapterListing = Menu:extend {
 }
 
 function ChapterListing:init()
-  self.title_bar_left_icon = "appbar.menu"
-  self.onLeftButtonTap = function()
-    self:openMenu()
-  end
-
   self.width = Screen:getWidth()
   self.height = Screen:getHeight()
 
@@ -92,8 +88,138 @@ function ChapterListing:init()
   -- idk might make some gc shenanigans actually work
   self.on_return_callback = nil
 
+  -- Strip the hamburger / close buttons from the title bar — those actions
+  -- live on the bottom action bar now, matching LibraryView's pattern.
+  self:clearTitleBarButtons()
+
+  self:_installActionBar()
+
   -- we need to do this after updating
   self:updateChapterList()
+end
+
+--- @private
+--- Empty out both title-bar slots so we render a title-only header.
+--- patchTitleBar() may later add a small language indicator on the left
+--- for multi-language manga.
+function ChapterListing:clearTitleBarButtons()
+  local empty_left = HorizontalSpan:new { width = 0 }
+  local empty_right = HorizontalSpan:new { width = 0 }
+  self.title_bar.left_button = empty_left
+  self.title_bar.right_button = empty_right
+  if self.title_bar[2] ~= nil then
+    self.title_bar[2] = empty_left
+  end
+  if self.title_bar[3] ~= nil then
+    self.title_bar[3] = empty_right
+  end
+end
+
+--- @private
+--- Replace KOReader's chevron pagination text with a stacked layout:
+---   [ Back · Resume · Refresh · Download · More ]
+---   [   <<   <   Page X of Y   >   >>   ]
+--- The skip-to-first / skip-to-last buttons (<<, >>) are KOReader's
+--- own pagination chevrons — they're preserved by capturing the
+--- original page_info children before wiping the row and reinserting
+--- them inside the new vertical layout.
+function ChapterListing:_installActionBar()
+  if not self.page_info or not self.page_info_text then return end
+
+  local actions = {
+    {
+      glyph = Icons.FA_ARROW_LEFT,
+      label = _("Back"),
+      callback = function() self:onClose() end,
+    },
+    {
+      glyph = Icons.RESTORE,
+      label = _("Resume"),
+      callback = function() self:readContinue(false) end,
+    },
+    {
+      glyph = Icons.REFRESHING,
+      label = _("Refresh"),
+      callback = function() self:refreshChapters() end,
+    },
+    {
+      glyph = Icons.FA_DOWNLOAD,
+      label = _("Download"),
+      callback = function() self:onDownloadUnreadChapters() end,
+    },
+    {
+      glyph = Icons.FA_ELLIPSIS_VERTICAL,
+      label = _("More"),
+      callback = function() self:openMenu() end,
+    },
+  }
+
+  local action_bar = ActionBar:new {
+    width = Screen:getWidth(),
+    show_parent = self,
+    actions = actions,
+  }
+
+  local page_info = self.page_info
+
+  -- Capture current children of page_info (chevron_first, chevron_left,
+  -- page_info_text, chevron_right, chevron_last). After a BaseMenu rebuild
+  -- (e.g. updateOfflineSubtitle on WiFi connect) these references are
+  -- fresh, so don't cache across installs.
+  local chevron_row = HorizontalGroup:new { align = "center" }
+  for i = 1, #page_info do
+    table.insert(chevron_row, page_info[i])
+  end
+
+  -- BaseMenu's _recalculateDimen sizes the items area based ONLY on
+  -- page_info_text:getSize().h, not on the parent HorizontalGroup. Wrap
+  -- page_info_text in a thin size proxy that reports the combined height
+  -- (action bar + gap + text + chevrons) so the items area doesn't draw
+  -- under our bar. Forward setText so updatePageInfo's "Page X of Y"
+  -- label keeps refreshing.
+  local original_text = self.page_info_text
+  if original_text._bobo_action_bar_proxy then
+    original_text = original_text._inner
+  end
+  local action_bar_h = action_bar:getSize().h + Screen:scaleBySize(2)
+  self.page_info_text = setmetatable({
+    _bobo_action_bar_proxy = true,
+    _inner = original_text,
+    _extra_h = action_bar_h,
+    setText = function(s, ...) return s._inner:setText(...) end,
+    getSize = function(s)
+      local sz = s._inner:getSize()
+      return { w = sz.w, h = sz.h + s._extra_h }
+    end,
+    paintTo = function(s, bb, x, y) return s._inner:paintTo(bb, x, y) end,
+  }, {
+    -- Forward any other field/method BaseMenu may poke at (.dimen,
+    -- :setEnabled, etc.) to the underlying Button so its internal
+    -- bookkeeping isn't broken.
+    __index = function(t, k) return t._inner[k] end,
+  })
+
+  for i = #page_info, 1, -1 do
+    page_info[i] = nil
+  end
+  page_info:resetLayout()
+  table.insert(page_info, VerticalGroup:new {
+    align = "center",
+    action_bar,
+    VerticalSpan:new { width = Screen:scaleBySize(2) },
+    chevron_row,
+  })
+end
+
+--- Re-install the action bar after the parent class rebuilds page_info.
+--- See LibraryView for the full rationale: widgets/Menu.lua's
+--- updateOfflineSubtitle calls BaseMenu.init on network state changes,
+--- which silently wipes our injected layout.
+function ChapterListing:updateOfflineSubtitle(skip_reinit)
+  Menu.updateOfflineSubtitle(self, skip_reinit)
+  if not skip_reinit and self.page_info_text then
+    self:_installActionBar()
+  end
 end
 
 function ChapterListing:onClose(call_return)
@@ -166,50 +292,32 @@ end
 
 --- @private
 --- @param count_lang number
+--- For multi-language manga, show a small language indicator on the left
+--- of the title bar. The hamburger that used to live next to it moved
+--- into the bottom action bar's More overflow.
 function ChapterListing:patchTitleBar(count_lang)
-  -- custom
   local left_icon_size_ratio = self.title_bar.left_icon_size_ratio
-
   local left_icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * left_icon_size_ratio)
-  local button_padding = Screen:scaleBySize(11)
 
-  self.title_bar.left_button = HorizontalGroup:new {
-    IconButton:new {
-      icon = "appbar.menu",
-      icon_rotation_angle = self.left_icon_rotation_angle,
-      width = left_icon_size,
-      height = left_icon_size,
-      padding = button_padding,
-      padding_bottom = left_icon_size,
-      callback = self.title_bar.left_icon_tap_callback,
-      hold_callback = self.title_bar.left_icon_hold_callback,
-      allow_flash = self.title_bar.left_icon_allow_flash,
-      show_parent = self.title_bar.show_parent,
-    },
-
-    VerticalGroup:new {
-      Button:new {
-        text = Icons.LANG .. " " .. count_lang,
-        face = SMALL_FONT_FACE,
-        bordersize = 0,
-        enabled = true,
-        text_font_size = left_icon_size,
-        text_font_bold = false,
-        callback = function()
-          self:showSelectLanguage()
-        end
-      },
-      VerticalSpan:new {
-        width = left_icon_size / 2
-      }
-    },
+  local lang_button = Button:new {
+    text = Icons.LANG .. " " .. count_lang,
+    face = SMALL_FONT_FACE,
+    bordersize = 0,
+    enabled = true,
+    text_font_size = left_icon_size,
+    text_font_bold = false,
+    callback = function()
+      self:showSelectLanguage()
+    end,
   }
+
+  self.title_bar.left_button = lang_button
 
   --- [1] title
   --- [2] left button
   --- [3] right button
   if self.title_bar[2] ~= nil then
-    self.title_bar[2] = self.title_bar.left_button
+    self.title_bar[2] = lang_button
   end
 end
 
@@ -935,14 +1043,6 @@ function ChapterListing:openMenu()
     },
     {
       {
-        text = Icons.REFRESHING .. " " .. _("Refresh"),
-        callback = function()
-          UIManager:close(dialog)
-
-          self:refreshChapters()
-        end
-      },
-      {
         text = Icons.INFO .. " " .. _("Details"),
         callback = function()
           UIManager:close(dialog)
@@ -983,29 +1083,11 @@ function ChapterListing:openMenu()
     },
     {
       {
-        text = Icons.RESTORE .. " " .. _("Resume"),
-        callback = function()
-          UIManager:close(dialog)
-
-          self:readContinue(false)
-        end
-      },
-      {
         text = Icons.ANGLES_RIGHT .. " " .. _("Next Chapter"),
         callback = function()
           UIManager:close(dialog)
 
           self:readContinue(true)
-        end
-      }
-    },
-    {
-      {
-        text = Icons.FA_DOWNLOAD .. " " .. _("Download unread chapters…"),
-        callback = function()
-          UIManager:close(dialog)
-
-          self:onDownloadUnreadChapters()
         end
       }
     }
