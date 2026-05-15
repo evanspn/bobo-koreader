@@ -5,6 +5,7 @@
 --
 -- Link to the font file: https://github.com/koreader/koreader-fonts/blob/master/nerdfonts/symbols.ttf
 return {
+  FA_ARROW_LEFT        = "\u{F060}",
   FA_ARROW_UP          = "\u{F062}",
   FA_BELL              = "\u{F0F3}",
   FA_BOOK              = "\u{F02D}",
