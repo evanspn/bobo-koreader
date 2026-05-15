@@ -121,6 +121,7 @@ package.loaded["Backend"]                     = {
   initialize = noop,
   createCancelId = function() return 1 end,
 }
+package.loaded["CrashReporter"]               = { showBugReportQr = noop }
 package.loaded["ErrorDialog"]                 = { show = noop }
 package.loaded["ChapterListing"]              = chapter_listing_stub
 package.loaded["MangaSearchResults"]          = {}

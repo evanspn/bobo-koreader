@@ -644,6 +644,35 @@ describe("MangaReader:onEndOfBook ignores stale is_showing", function()
     assert.equal(0, fired)
     assert.is_nil(handled)
   end)
+
+  -- Regression: end-of-book fires synchronously inside KOReader's
+  -- onGotoPageRel, which still calls updateFooterText after our handler
+  -- returns. If we run the chapter-advance callback inline, switchDocument
+  -- nils self.view.document mid-event and the footer crashes with
+  -- "readerfooter.lua: attempt to index field 'document' (a nil value)".
+  -- The callback must be deferred via UIManager:nextTick so the page-turn
+  -- event chain can unwind first.
+  it("defers the chapter-advance callback so KOReader's page-turn chain can unwind", function()
+    local uimanager = package.loaded["ui/uimanager"]
+    local original_nextTick = uimanager.nextTick
+    local pending_tick
+    uimanager.nextTick = function(_, fn) pending_tick = fn end
+
+    local fired = 0
+    MangaReader.is_showing               = true
+    MangaReader.chapter                  = make_chapter("ch1", 1)
+    MangaReader.on_end_of_book_callback  = function() fired = fired + 1 end
+
+    local handled = MangaReader:onEndOfBook()
+
+    assert.is_true(handled, "must still consume the event so the default popup is suppressed")
+    assert.equal(0, fired, "callback must NOT fire synchronously — that's what crashes the footer")
+    assert.is_not_nil(pending_tick, "callback must be queued via UIManager:nextTick")
+    pending_tick()
+    assert.equal(1, fired, "queued callback must run once the next tick fires")
+
+    uimanager.nextTick = original_nextTick
+  end)
 end)
 
 describe("MangaReader:onPageUpdate ignores stale is_showing", function()

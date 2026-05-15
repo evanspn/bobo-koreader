@@ -86,4 +86,80 @@ function CrashReporter.showQrFor(opts)
   })
 end
 
+-- Candidate locations for KOReader's uncaught-error trace ("Don't Panic"
+-- screen contents). The exact path varies by platform: KOReader's reader.lua
+-- writes a relative `./crash.log`, but cwd can be anywhere depending on the
+-- launcher. Try a few common spots in order. Tests inject their own list.
+function CrashReporter._defaultCrashLogPaths()
+  local paths = { "./crash.log", "crash.log" }
+  local ok, DataStorage = pcall(require, "datastorage")
+  if ok and DataStorage and DataStorage.getDataDir then
+    table.insert(paths, 1, DataStorage:getDataDir() .. "/crash.log")
+  end
+  return paths
+end
+
+-- Read the tail of KOReader's crash log, if one exists. Returns nil when no
+-- readable log was found at any candidate path. The log is most informative
+-- at the end (the panic line, the final traceback), so we keep the tail when
+-- it exceeds max_chars.
+---@param opts { paths: string[]|nil, max_chars: number|nil }|nil
+---@return string|nil
+function CrashReporter.readCrashLogTail(opts)
+  opts = opts or {}
+  local paths = opts.paths or CrashReporter._defaultCrashLogPaths()
+  local max_chars = opts.max_chars or 4000
+
+  for _, path in ipairs(paths) do
+    local f = io.open(path, "r")
+    if f then
+      local content = f:read("*a") or ""
+      f:close()
+      if #content > 0 then
+        return CrashReporter._truncate(content, max_chars)
+      end
+    end
+  end
+  return nil
+end
+
+-- Build a body for a user-initiated bug report. If a KOReader crash log is
+-- available, its tail is appended in a fenced code block so the report
+-- carries the most recent traceback the device has on disk.
+---@param opts { paths: string[]|nil }|nil
+---@return string
+function CrashReporter.buildBugReportBody(opts)
+  local lines = {
+    "## What happened?",
+    "",
+    "<!-- Describe what you were doing when the bug occurred. -->",
+    "",
+    "## Expected behavior",
+    "",
+    "<!-- What should have happened instead? -->",
+    "",
+  }
+  local log = CrashReporter.readCrashLogTail(opts)
+  if log then
+    table.insert(lines, "## Last KOReader crash log")
+    table.insert(lines, "")
+    table.insert(lines, "```")
+    table.insert(lines, log)
+    table.insert(lines, "```")
+  end
+  return table.concat(lines, "\n")
+end
+
+-- Show the QR code modal for a generic user-initiated bug report. Pulls in
+-- the tail of KOReader's crash log when one exists so a recent panic gets
+-- attached automatically.
+---@param opts { title: string|nil, paths: string[]|nil }|nil
+function CrashReporter.showBugReportQr(opts)
+  opts = opts or {}
+  CrashReporter.showQrFor {
+    title = opts.title or "Bug report",
+    body  = CrashReporter.buildBugReportBody { paths = opts.paths },
+  }
+end
+
 return CrashReporter
