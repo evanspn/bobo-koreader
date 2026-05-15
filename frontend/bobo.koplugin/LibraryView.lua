@@ -20,6 +20,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local addToPlaylist = require("handlers/addToPlaylist")
 
 local Backend = require("Backend")
+local CrashReporter = require("CrashReporter")
 local ErrorDialog = require("ErrorDialog")
 local ChapterListing = require("ChapterListing")
 local MangaSearchResults = require("MangaSearchResults")
@@ -978,6 +979,13 @@ function LibraryView:openMenu()
         callback = function()
           UIManager:close(dialog)
           UpdateChecker:checkForUpdates()
+        end
+      },
+      {
+        text = Icons.FA_BUG .. " " .. _("Report a bug"),
+        callback = function()
+          UIManager:close(dialog)
+          CrashReporter.showBugReportQr()
         end
       },
     },

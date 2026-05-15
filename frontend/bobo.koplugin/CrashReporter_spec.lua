@@ -129,3 +129,88 @@ describe("CrashReporter.showQrFor", function()
     assert.is_true(last_qr_shown.text:find("title=Boom", 1, true) ~= nil)
   end)
 end)
+
+-- Helper: write a temp file with known contents, return its path. The OS's
+-- tmp dir is used because busted may run from anywhere.
+local function write_tmp(name, contents)
+  local path = os.tmpname()
+  -- os.tmpname returns a unique path; nuke any leftover and rewrite cleanly.
+  local f = assert(io.open(path, "w"))
+  f:write(contents)
+  f:close()
+  return path
+end
+
+describe("CrashReporter.readCrashLogTail", function()
+  it("returns nil when none of the candidate paths exist", function()
+    local log = CrashReporter.readCrashLogTail {
+      paths = { "/nonexistent/__bobo_test_crash.log" },
+    }
+    assert.is_nil(log)
+  end)
+
+  it("returns the file contents when a candidate path exists", function()
+    local path = write_tmp("crash", "panic line\ntrace\n")
+    local log = CrashReporter.readCrashLogTail { paths = { path } }
+    os.remove(path)
+    assert.equal("panic line\ntrace\n", log)
+  end)
+
+  it("keeps the tail when the log exceeds max_chars", function()
+    local body = string.rep("noise\n", 1000) .. "FINAL_PANIC"
+    local path = write_tmp("crash", body)
+    local log = CrashReporter.readCrashLogTail { paths = { path }, max_chars = 200 }
+    os.remove(path)
+    assert.is_not_nil(log)
+    assert.is_true(#log <= 200, "expected length <=200, got " .. #log)
+    assert.is_true(log:find("FINAL_PANIC", 1, true) ~= nil,
+      "tail must contain the most recent line")
+  end)
+
+  it("falls through to the next candidate when the first does not exist", function()
+    local path = write_tmp("crash", "secondary log")
+    local log = CrashReporter.readCrashLogTail {
+      paths = { "/nonexistent/__bobo_test_crash.log", path },
+    }
+    os.remove(path)
+    assert.equal("secondary log", log)
+  end)
+end)
+
+describe("CrashReporter.buildBugReportBody", function()
+  it("emits a structured template even without a crash log", function()
+    local body = CrashReporter.buildBugReportBody {
+      paths = { "/nonexistent/__bobo_test_crash.log" },
+    }
+    assert.is_true(body:find("What happened?", 1, true) ~= nil)
+    assert.is_true(body:find("Expected behavior", 1, true) ~= nil)
+    assert.is_nil(body:find("crash log", 1, true),
+      "must not advertise a crash log when none was found")
+  end)
+
+  it("appends the crash log in a fenced code block when one is found", function()
+    local path = write_tmp("crash", "panic line\ntrace\n")
+    local body = CrashReporter.buildBugReportBody { paths = { path } }
+    os.remove(path)
+    assert.is_true(body:find("Last KOReader crash log", 1, true) ~= nil)
+    assert.is_true(body:find("panic line", 1, true) ~= nil)
+    assert.is_true(body:find("```", 1, true) ~= nil,
+      "log must be wrapped in a fenced code block")
+  end)
+end)
+
+describe("CrashReporter.showBugReportQr", function()
+  before_each(function()
+    last_qr_shown = nil
+  end)
+
+  it("shows a QR with a bug-report title and the structured body", function()
+    CrashReporter.showBugReportQr {
+      paths = { "/nonexistent/__bobo_test_crash.log" },
+    }
+    assert.is_not_nil(last_qr_shown)
+    assert.is_string(last_qr_shown.text)
+    assert.is_true(last_qr_shown.text:find("evanspn/bobo-koreader", 1, true) ~= nil)
+    assert.is_true(last_qr_shown.text:find("title=Bug%%20report", 1, false) ~= nil)
+  end)
+end)

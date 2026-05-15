@@ -38,4 +38,5 @@ return {
   FA_CHART_BAR         = "\u{f080}",
   FA_TH_LARGE          = "\u{f009}",
   FA_TIMES             = "\u{f00d}",
+  FA_BUG               = "\u{f188}",
 }

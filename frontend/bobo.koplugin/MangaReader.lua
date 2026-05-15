@@ -355,7 +355,16 @@ function MangaReader:onEndOfBook()
       self:startPreloading(self.chapter)
     end
 
-    self.on_end_of_book_callback()
+    -- Defer the chapter switch to the next tick. End-of-book fires
+    -- synchronously inside KOReader's page-turn handler (onGotoPageRel),
+    -- and that handler still touches self.view.document after we return —
+    -- e.g. via the footer's updateFooterText. If we run the callback now,
+    -- switchDocument nils the document mid-event and the follow-up touches
+    -- crash with "readerfooter.lua: attempt to index field 'document' (a
+    -- nil value)". Deferring lets the page-turn handler unwind cleanly
+    -- before we tear the document down and open the next chapter.
+    local cb = self.on_end_of_book_callback
+    UIManager:nextTick(function() cb() end)
     return true
   end
 end
