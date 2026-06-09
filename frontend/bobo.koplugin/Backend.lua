@@ -40,13 +40,14 @@ end
 --- @class SuccessfulResponse<T>: { type: 'SUCCESS', body: T }
 --- @class ErrorResponse: { type: 'ERROR', status: number, message: string }
 
---- Performs a HTTP request, using JSON to encode the request body and to decode the response body.
+--- Performs a HTTP request without any recovery logic. Prefer `Backend.requestJson`,
+--- which restarts a dead server and retries the request once.
 --- @private
 --- @param request RequestParameters The parameters used for this request.
 --- @generic T: any
 --- @nodiscard
 --- @return SuccessfulResponse<T>|ErrorResponse # The parsed JSON response or nil, if there was an error.
-function Backend.requestJson(request)
+function Backend._performRequest(request)
   assert(Backend.server ~= nil, "backend wasn't initialized!")
   local url = require("socket.url")
 
@@ -108,13 +109,46 @@ function Backend.requestJson(request)
   return { type = 'SUCCESS', body = replaceRapidJsonNullWithNilRecursively(parsed_body) }
 end
 
+--- Performs a HTTP request, using JSON to encode the request body and to decode the response body.
+---
+--- If the request fails at the transport level (the Unix socket is gone or not
+--- answering — typically because the server process was killed while the device
+--- slept), the server is health-checked, restarted when found dead, and the
+--- request retried once. HTTP-level errors (carrying a status code) are
+--- returned as-is.
+--- @param request RequestParameters The parameters used for this request.
+--- @generic T: any
+--- @nodiscard
+--- @return SuccessfulResponse<T>|ErrorResponse # The parsed JSON response or nil, if there was an error.
+function Backend.requestJson(request)
+  local response = Backend._performRequest(request)
+
+  if response.type ~= 'ERROR' or response.status ~= nil then
+    return response
+  end
+
+  -- Transport-level failure. Health-check before assuming the server died: a
+  -- slow-but-alive server (a legitimately timed-out request) must not be
+  -- restarted out from under whatever else it is doing.
+  if Backend.isHealthy() then
+    return response
+  end
+
+  logger.warn("bobo: backend is not responding, restarting it. original error:", response.message)
+  if not Backend.restartServer() then
+    return response
+  end
+
+  return Backend._performRequest(request)
+end
+
 ---@return boolean
 local function waitUntilHttpServerIsReady()
   local start_time = os.time()
 
   while os.time() - start_time < SERVER_STARTUP_TIMEOUT_SECONDS do
     local ok, response = pcall(function()
-      return Backend.requestJson({
+      return Backend._performRequest({
         path = '/health-check',
         timeout = 1,
       })
@@ -144,6 +178,47 @@ function Backend.initialize()
   end
 
   return true, nil
+end
+
+--- Whether the server answers a health check within a short timeout.
+---@return boolean
+function Backend.isHealthy()
+  if Backend.server == nil then
+    return false
+  end
+
+  local ok, response = pcall(Backend._performRequest, {
+    path = '/health-check',
+    timeout = 2,
+  })
+
+  return ok and response.type == 'SUCCESS'
+end
+
+--- Stops the current server process (if any) and starts a fresh one.
+---@return boolean success Whether the new server came up successfully.
+---@return string|nil logs On error, the last logs written by the server.
+function Backend.restartServer()
+  if Backend.server ~= nil then
+    pcall(function() Backend.server:stop() end)
+    Backend.server = nil
+  end
+
+  return Backend.initialize()
+end
+
+--- Health-checks the server and restarts it when unresponsive. The server
+--- process can die while the device sleeps (killed under memory pressure or
+--- by power management); call this on wake-up so the UI keeps working.
+---@return boolean success Whether a responsive server is now running.
+---@return string|nil logs On error, the last logs written by the server.
+function Backend.ensureRunning()
+  if Backend.isHealthy() then
+    return true, nil
+  end
+
+  logger.warn("bobo: backend is not responding, restarting it")
+  return Backend.restartServer()
 end
 
 --- @class SourceInformation

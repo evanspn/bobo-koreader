@@ -62,6 +62,25 @@ FrameContainer          (border_size padding, full screen)
 
 Setting an item to `item_width` (the container width) instead of subtracting the scrollbar width causes the item to overflow outside the visible area.
 
+## Full-screen stacks: size the last section from the remaining space
+
+A full-screen `VerticalGroup` made of fixed-height sections will overflow the
+screen bottom on smaller devices (and waste space on larger ones) — screen
+sizes vary wildly across Kobo models and orientations.
+
+Pattern (see `MangaInfoWidget:getStatusContent`): build every section except
+the last, sum their `getSize().h`, and hand `Screen:getHeight() - used` to the
+final *scrollable* section, clamped to a usable minimum:
+
+```lua
+local used = title_bar:getSize().h + book_info:getSize().h + stats:getSize().h
+local remaining = Screen:getHeight() - used
+local box_height = math.max(remaining, Screen:scaleBySize(80))
+```
+
+The last section must be scrollable (e.g. `ScrollTextWidget`) so clamping to
+the minimum never hides content.
+
 ## The `_` (gettext) variable
 
 The plugin uses `local _ = require("gettext+")` as the translation function. **Never use `_` as a throwaway loop variable** in the same scope — the standard `for _, v in ipairs(t)` pattern shadows it:

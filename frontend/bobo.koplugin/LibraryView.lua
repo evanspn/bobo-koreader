@@ -891,10 +891,15 @@ end
 --- @private
 --- The "More" overflow opened from the bottom action bar. Search for
 --- mangas, Playlists, Refresh mangas, and Settings live in the bar
---- itself; this dialog only carries the secondary actions, plus
---- Notifications (with current unread count) and the items that didn't
---- earn a dedicated cell (Sort by, Search favorites, Refresh details,
---- Cleaner, Manage sources, Check for updates, Sync Database).
+--- itself; this dialog only carries the secondary actions, grouped by
+--- purpose so related buttons sit on the same row (never more than two
+--- per row, so labels stay readable on narrow screens):
+---   activity      → Notifications (with unread count) · Statistics
+---   finding       → Sort by · Search favorites
+---   maintenance   → Refresh details · Cleaner chapters
+---   management    → Manage playlists · Manage sources
+---   app           → Check for updates · Report a bug
+---   sync          → Sync Database
 function LibraryView:openMenu()
   local dialog
   local notify_count = self._notify_count or 0
@@ -917,6 +922,13 @@ function LibraryView:openMenu()
           end)
         end
       },
+      {
+        text = Icons.FA_CHART_BAR .. " " .. _("Statistics"),
+        callback = function()
+          UIManager:close(dialog)
+          self:openStatistics()
+        end
+      },
     },
     {
       {
@@ -931,15 +943,6 @@ function LibraryView:openMenu()
         callback = function()
           UIManager:close(dialog)
           self:openSearchFavoritesDialog()
-        end
-      },
-    },
-    {
-      {
-        text = Icons.FA_CHART_BAR .. " " .. _("Statistics"),
-        callback = function()
-          UIManager:close(dialog)
-          self:openStatistics()
         end
       },
     },
@@ -974,6 +977,8 @@ function LibraryView:openMenu()
           self:openInstalledSourcesListing()
         end
       },
+    },
+    {
       {
         text = Icons.FA_ARROW_UP .. " " .. _("Check for updates"),
         callback = function()
