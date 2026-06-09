@@ -381,4 +381,36 @@ describe("ChapterListing redesign — bottom action bar + slim title bar", funct
     assert.is_not_nil(find_button(last_button_dialog, "Filter by Group"),
       "Filter by Group overflow entry must appear when 2+ scanlators exist")
   end)
+
+  it("openMenu groups related actions and never packs more than two buttons per row", function()
+    local view = make_view({
+      langs = { { id = "en", name = "en" }, { id = "ja", name = "ja" } },
+      available_scanlators = { "Group A", "Group B" },
+    })
+    view:openMenu()
+    assert.is_not_nil(last_button_dialog)
+
+    for i, row in ipairs(last_button_dialog.buttons) do
+      assert.is_true(#row <= 2,
+        "row " .. i .. " packs " .. #row .. " buttons; labels get cramped beyond two per row")
+    end
+
+    local function row_of(label)
+      for i, row in ipairs(last_button_dialog.buttons) do
+        for _, btn in ipairs(row) do
+          if type(btn.text) == "string" and btn.text:find(label, 1, true) then
+            return i
+          end
+        end
+      end
+      return nil
+    end
+
+    assert.equal(row_of("Add to Library"), row_of("Details"),
+      "manga-level actions share a row")
+    assert.equal(row_of("Mark read"), row_of("Mark unread"),
+      "read-state actions share a row")
+    assert.equal(row_of("Languages"), row_of("Filter by Group"),
+      "both list filters share the bottom row")
+  end)
 end)

@@ -374,6 +374,34 @@ describe("LibraryView cover-tap / context-menu wiring", function()
     assert.is_not_nil(find("Statistics"),         "Statistics opens the per-profile stats view from the overflow")
   end)
 
+  it("openMenu groups related actions and never packs more than two buttons per row", function()
+    local view = make_view()
+    view:openMenu()
+    assert.is_not_nil(last_button_dialog)
+
+    for i, row in ipairs(last_button_dialog.buttons) do
+      assert.is_true(#row <= 2,
+        "row " .. i .. " packs " .. #row .. " buttons; labels get cramped beyond two per row")
+    end
+
+    local function row_of(label)
+      for i, row in ipairs(last_button_dialog.buttons) do
+        for _, btn in ipairs(row) do
+          if type(btn.text) == "string" and btn.text:find(label, 1, true) then
+            return i
+          end
+        end
+      end
+      return nil
+    end
+
+    assert.equal(row_of("Notifications"),     row_of("Statistics"),       "activity entries share a row")
+    assert.equal(row_of("Sort by..."),        row_of("Search favorites"), "finding entries share a row")
+    assert.equal(row_of("Refresh details"),   row_of("Cleaner chapters"), "maintenance entries share a row")
+    assert.equal(row_of("Manage playlists"),  row_of("Manage sources"),   "management entries share a row")
+    assert.equal(row_of("Check for updates"), row_of("Report a bug"),     "app-level entries share a row")
+  end)
+
   it("openMenu's Statistics entry calls openStatistics", function()
     local view = make_view()
     local calls = 0

@@ -1015,6 +1015,13 @@ function ChapterListing:openChapterOnReader(chapter, download_job)
 end
 
 --- @private
+--- The "More" overflow opened from the bottom action bar. Grouped by
+--- purpose, never more than two buttons per row:
+---   navigation   → Back to library
+---   manga        → Add to Library · Details
+---   read state   → Mark read · Mark unread
+---   reading      → Next Chapter
+---   filters      → Languages · Filter by Group (only when applicable)
 function ChapterListing:openMenu()
   local dialog
 
@@ -1040,8 +1047,6 @@ function ChapterListing:openMenu()
           self:addToLibrary()
         end
       },
-    },
-    {
       {
         text = Icons.INFO .. " " .. _("Details"),
         callback = function()
@@ -1093,35 +1098,36 @@ function ChapterListing:openMenu()
     }
   }
 
-  if #self.langs >= 2 then
-    table.insert(buttons, 2,
-      {
-        {
-          text = Icons.LANG .. " " .. _("Languages"),
-          callback = function()
-            UIManager:close(dialog)
+  -- Both list filters share the bottom row.
+  local filter_row = {}
 
-            self:showSelectLanguage()
-          end
-        }
-      })
+  if #self.langs >= 2 then
+    table.insert(filter_row, {
+      text = Icons.LANG .. " " .. _("Languages"),
+      callback = function()
+        UIManager:close(dialog)
+
+        self:showSelectLanguage()
+      end
+    })
   end
 
-  -- Add scanlator filter button if multiple scanlators exist
   if #self.available_scanlators > 1 then
     local scanlator_text = self.selected_scanlator and
         (Icons.FA_FILTER .. " " .. _("Group") .. ": " .. self.selected_scanlator) or
         Icons.FA_FILTER .. " " .. _("Filter by Group")
 
-    table.insert(buttons, {
-      {
-        text = scanlator_text,
-        callback = function()
-          UIManager:close(dialog)
-          self:showScanlatorDialog()
-        end
-      }
+    table.insert(filter_row, {
+      text = scanlator_text,
+      callback = function()
+        UIManager:close(dialog)
+        self:showScanlatorDialog()
+      end
     })
+  end
+
+  if #filter_row > 0 then
+    table.insert(buttons, filter_row)
   end
 
   dialog = ButtonDialog:new {
