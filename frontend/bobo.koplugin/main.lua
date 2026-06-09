@@ -46,6 +46,22 @@ function Bobo:init()
   Testing:emitEvent('initialized')
 end
 
+--- The backend process can be killed while the device sleeps. When that
+--- happens, every back button "exits the app": the return callback re-fetches
+--- from a dead backend, errors out, and never re-opens the previous screen.
+--- Health-check and revive the server as soon as the device wakes so
+--- navigation keeps working.
+function Bobo:onResume()
+  if not backendInitialized then
+    return
+  end
+
+  -- Give the system a moment to settle after wake-up before poking the socket.
+  UIManager:scheduleIn(1, function()
+    backendInitialized, logs = Backend.ensureRunning()
+  end)
+end
+
 function Bobo:onBoboStartLibraryView()
   if self.ui.name == "ReaderUI" then
     MangaReader:initializeFromReaderUI(self.ui)
