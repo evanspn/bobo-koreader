@@ -141,15 +141,30 @@ function MangaInfoWidget:getStatusContent(width, manga)
     end,
     show_parent = self,
   }
+  local book_info = self:genBookInfoGroup(manga)
+  local stats_header = self:genHeader(_("Statistics"))
+  local stats = self:genStatisticsGroup(width, manga)
+  local description_header = self:genHeader(_("Description"))
+
+  -- Give the description whatever vertical space is left so the whole page is
+  -- guaranteed to fit on screen. With the previous fixed heights the stack
+  -- overflowed past the bottom on smaller portrait screens (and wasted space
+  -- on larger ones). The description box scrolls, so any height works.
+  local used_height = title_bar:getSize().h
+      + book_info:getSize().h
+      + stats_header:getSize().h
+      + stats:getSize().h
+      + description_header:getSize().h
+  local summary_height = Screen:getHeight() - used_height
+
   local content = VerticalGroup:new {
     align = "left",
     title_bar,
-    self:genBookInfoGroup(manga),
-    self:genHeader(_("Statistics")),
-    self:genStatisticsGroup(width, manga),
-    self:genHeader(_("Description")),
-    self:genSummaryGroup(width, manga),
-    -- self:genHeader(_("Book")),
+    book_info,
+    stats_header,
+    stats,
+    description_header,
+    self:genSummaryGroup(width, manga, summary_height),
   }
   return content
 end
@@ -468,13 +483,14 @@ function MangaInfoWidget:getNSFW(manga)
 end
 
 --- @param manga MManga
-function MangaInfoWidget:genSummaryGroup(width, manga)
-  local height
-  if Screen:getScreenMode() == "landscape" then
-    height = Screen:scaleBySize(80)
-  else
-    height = Screen:scaleBySize(160)
-  end
+--- @param available_height number The leftover vertical space below the
+--- Description header. The box is clamped to a readable minimum — it
+--- scrolls, so a small window still works — but it must never push the
+--- layout past the bottom of the screen.
+function MangaInfoWidget:genSummaryGroup(width, manga, available_height)
+  local span_height = Size.span.vertical_large
+  local min_height = Screen:scaleBySize(80)
+  local height = math.max((available_height or 0) - span_height, min_height)
 
   local text_padding = Size.padding.default
   self.input_note = ScrollTextWidget:new {
