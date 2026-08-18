@@ -38,3 +38,14 @@ Use conventional commits (`feat:`, `fix:`) — semantic-release derives the vers
 - **Read [`docs/src/contributing/koreader-ui-guide.md`](docs/src/contributing/koreader-ui-guide.md) before touching any file under `frontend/bobo.koplugin/`** — it documents the KOReader widget patterns and busted-stubbing gotchas (lazy `dimen`, scrollbar widths, `_G.G_reader_settings`, colon-vs-dot stubs, Trapper coroutine errors) that this plugin has hit repeatedly.
 - **Every distinct piece of work goes in its own PR.** Never pile a follow-up commit onto a branch whose PR has already merged or closed — CI won't run on it. If the assigned branch's PR is already merged, push the new work to a fresh branch and open a new PR so the test workflows execute against it.
 - **A PR isn't done until its checks pass.** After opening or updating a PR, watch the CI checks (subscribe to PR activity and/or poll on a timer) until every check is green. If a check fails — even for reasons unrelated to the change, like toolchain drift — diagnose it, push the fix, and keep watching. Never end the task while checks are pending or red.
+
+# Front-end work: demo first
+
+UI work in this repo goes through the design review gallery before any code
+lands here. Publish a self-contained mockup to `evanspn/demo-environment`
+(its `design-review` skill has the procedure), send the link, and wait for
+approval — feedback arrives as pinned comments in the gallery.
+
+- Gallery: https://design-review-seven-brown.vercel.app
+- Design mobile-first for iPhone 14 Pro Max (430x932 logical viewport).
+- Tag published designs with this repo as `parent_repo`.
